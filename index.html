@@ -232,6 +232,15 @@ function getDeviceId(){
   return id;
 }
 
+/* ---------------- DOUBLE-SUBMIT GUARD (prevents duplicate records from double-clicks / slow network) ---------------- */
+const inFlightActions = new Set();
+async function guardOnce(key, fn){
+  if(inFlightActions.has(key)) return; // a submission with this key is already running — ignore the extra click
+  inFlightActions.add(key);
+  try{ return await fn(); }
+  finally{ inFlightActions.delete(key); }
+}
+
 const state = {
   loading:true,
   role:'resident', view:'feed',
@@ -493,7 +502,7 @@ function viewFeed(){
 function qa(icon,label,view){ return `<button class="qa-btn" onclick="setView('${view}')"><span class="qa-icon">${icon}</span><span class="qa-label">${label}</span></button>`; }
 function feedCard(inc){
   return `<div class="card feed-item" onclick="openIncident('${inc.id}')">
-    <div class="feed-icon" style="background:${catColor[inc.category]}22; color:${catColor[inc.category]};">${catIcon[inc.category]||'📍'}</div>
+    <div class="feed-icon" style="background:${catColor[inc.category]||'var(--paper-dim)'}22; color:${catColor[inc.category]||'var(--paper-dim)'};">${catIcon[inc.category]||'📍'}</div>
     <div class="feed-body">
       <div class="feed-top"><span class="feed-title">${escapeHtml(inc.title)}</span>${statusBadge(inc.status)}</div>
       <div class="feed-meta">${inc.category} · ${fmtAgo(inc.createdAt)} · Severity: <span style="color:${severityColor(inc.severity)}">${inc.severity}</span></div>
@@ -660,8 +669,9 @@ async function confirmIncident(id){
   toast('Confirmation recorded', `Confidence is now ${inc.confidence}%.`, '✅');
   renderContent();
 }
-async function advanceIncident(id, status){
+async function advanceIncident(id, status){ return guardOnce('advanceIncident:'+id+':'+status, async ()=>{
   const inc = data.incidents.find(i=>i.id===id);
+  if(!inc || inc.status===status) return;
   inc.status = status;
   const label = status==='responding' ? 'Response dispatched by organization.' : 'Marked resolved by organization.';
   inc.timeline.push({time:now(), text:label, source:'official', by: activeOrgName()});
@@ -674,15 +684,16 @@ async function advanceIncident(id, status){
   }
   toast('Status updated', label, '📣');
   renderContent();
-}
-async function openCaseFor(incidentId){
+});}
+async function openCaseFor(incidentId){ return guardOnce('openCaseFor:'+incidentId, async ()=>{
+  if(data.cases.some(c=>c.incidentId===incidentId)) return; // a case already exists for this incident
   const inc = data.incidents.find(i=>i.id===incidentId);
   const c = {id:uid('case'), incidentId, org:activeOrgName(), title:inc.title, status:'in-progress', priority:inc.severity, assignedTeam:'Unassigned', updatedAt:now()};
   data.cases.unshift(c);
   await persist('cases');
   toast('Case opened', 'This incident now has an operational case.', '🗂️');
   renderContent();
-}
+});}
 function activeOrgName(){ return data.orgs[0] ? data.orgs[0].name : 'Responding organization'; }
 function miniMapField(key, hintText){
   return `<div class="field"><label>Location on map</label>
@@ -726,7 +737,7 @@ function viewProviderRegister(){
     </div>
   `;
 }
-async function submitProvider(){
+async function submitProvider(){ return guardOnce('submitProvider', async ()=>{
   const name = document.getElementById('pv-name').value.trim();
   const category = document.getElementById('pv-category').value.trim();
   if(!name || !category){ toast('Missing info', 'Name and category are required.', '⚠️'); return; }
@@ -739,7 +750,7 @@ async function submitProvider(){
   pinCoords.pv = null;
   toast('Provider registered', 'Your listing is live and marked unverified.', '✅');
   setView('services');
-}
+});}
 function openProvider(id){ state.selectedProvider=id; setView('provider'); }
 function viewProvider(){
   const p = data.providers.find(p=>p.id===state.selectedProvider);
@@ -758,7 +769,7 @@ function viewProvider(){
     </div>
   `;
 }
-async function requestBooking(pid){
+async function requestBooking(pid){ return guardOnce('requestBooking:'+pid, async ()=>{
   const p = data.providers.find(p=>p.id===pid);
   const desc = document.getElementById('bk-desc').value.trim();
   if(!desc){ toast('Missing info', 'Describe what you need first.', '⚠️'); return; }
@@ -768,7 +779,7 @@ async function requestBooking(pid){
   await persist('bookings');
   toast('Request sent', `${p.name} has been notified.`, '📩');
   setView('bookings');
-}
+});}
 function viewBookings(){
   if(!data.bookings.length) return `<div class="page-head"><div class="page-title">My Requests</div></div><div class="empty-state"><div class="e-icon">📋</div>No service requests yet.</div>`;
   return `<div class="page-head"><div><div class="page-title">My Requests</div></div></div><div class="grid grid-2">
@@ -776,12 +787,14 @@ function viewBookings(){
       <div class="feed-meta" style="margin-top:4px;">${escapeHtml(b.desc)}</div><div class="feed-meta" style="margin-top:6px;">Requested ${fmtAgo(b.time)}</div>
       ${b.status==='pending'?`<button class="btn btn-secondary" style="margin-top:10px;" onclick="acceptBooking('${b.id}')">Mark accepted by provider</button>`:''}</div>`).join('')}</div>`;
 }
-async function acceptBooking(id){
-  const b = data.bookings.find(b=>b.id===id); b.status='accepted';
+async function acceptBooking(id){ return guardOnce('acceptBooking:'+id, async ()=>{
+  const b = data.bookings.find(b=>b.id===id);
+  if(!b || b.status==='accepted') return;
+  b.status='accepted';
   await persist('bookings');
   toast('Booking accepted', `${b.providerName} accepted the request.`, '✅');
   renderContent();
-}
+});}
 
 /* ---------------- REPORT ---------------- */
 function viewReport(){
@@ -789,7 +802,7 @@ function viewReport(){
     <div class="page-head"><div><div class="page-title">Report an incident</div><div class="page-sub">What happened? Where? How serious does it appear?</div></div></div>
     <div class="card" style="max-width:560px;">
       <div class="field"><label>Title</label><input id="rp-title" placeholder="Short summary, e.g. Flooding near Muthurwa"></div>
-      <div class="field"><label>Category</label><select id="rp-category"><option>Flooding</option><option>Transport</option><option>Utilities</option><option>Infrastructure</option><option>Safety</option><option>Other</option></select></div>
+      <div class="field"><label>Category</label><input id="rp-category" placeholder="e.g. Flooding, Transport, Utilities, Safety..."></div>
       <div class="field"><label>What happened?</label><textarea id="rp-desc" placeholder="Describe what you're seeing..."></textarea></div>
       <div class="field"><label>Your name (optional)</label><input id="rp-name" placeholder="Anonymous by default"></div>
       ${miniMapField('rp', 'Tap the map to mark exactly where this is happening.')}
@@ -805,12 +818,13 @@ function viewReport(){
 }
 let pickedSeverity = 'medium';
 function pickSeverity(s){ pickedSeverity=s; ['low','medium','high'].forEach(x=>document.getElementById('sev-'+x).classList.toggle('on', x===s)); }
-async function submitReport(){
+async function submitReport(){ return guardOnce('submitReport', async ()=>{
   const title = document.getElementById('rp-title').value.trim();
   const desc = document.getElementById('rp-desc').value.trim();
   if(!title){ toast('Missing info', 'Give the report a short title.', '⚠️'); return; }
   if(!pinCoords.rp){ toast('Missing location', 'Tap the map or use your location to mark where this is happening.', '⚠️'); return; }
-  const category = document.getElementById('rp-category').value;
+  const category = document.getElementById('rp-category').value.trim();
+  if(!category){ toast('Missing info', 'Enter a category for this report.', '⚠️'); return; }
   const reportedBy = document.getElementById('rp-name').value.trim() || 'Anonymous resident';
   const inc = {
     id:uid('inc'), title, category, description:desc, severity:pickedSeverity, status:'active',
@@ -823,7 +837,7 @@ async function submitReport(){
   toast('Report submitted', 'Your incident is now live.', '📝');
   pickedSeverity='medium'; pinCoords.rp=null;
   openIncident(inc.id);
-}
+});}
 
 /* ---------------- ALERTS ---------------- */
 function viewAlerts(){
@@ -846,7 +860,7 @@ function viewOrgRegister(){
       <button class="btn btn-primary" onclick="submitOrg()">Register organization</button>
     </div>`;
 }
-async function submitOrg(){
+async function submitOrg(){ return guardOnce('submitOrg', async ()=>{
   const name = document.getElementById('org-name').value.trim();
   if(!name){ toast('Missing info','Organization name required.','⚠️'); return; }
   const sector = document.getElementById('org-sector').value.trim();
@@ -854,7 +868,7 @@ async function submitOrg(){
   await persist('orgs');
   toast('Organization registered', 'Unverified until confirmed by Hali Mtaani.', '✅');
   setView('org-dash');
-}
+});}
 function viewOrgDash(){
   if(!data.orgs.length){
     return `<div class="page-head"><div><div class="page-title">Operations Dashboard</div></div></div><div class="empty-state"><div class="e-icon">🏢</div>No organization registered yet.<br><br><button class="btn btn-primary" onclick="setView('org-register')">Register your organization</button></div>`;
@@ -891,7 +905,7 @@ function viewOrgComms(){
       <button class="btn btn-primary" onclick="postOfficial()">Publish official update</button>
     </div>`;
 }
-async function postOfficial(){
+async function postOfficial(){ return guardOnce('postOfficial', async ()=>{
   const id = document.getElementById('comms-inc').value;
   const text = document.getElementById('comms-text').value.trim();
   if(!text){ toast('Missing info','Write a message first.','⚠️'); return; }
@@ -900,7 +914,7 @@ async function postOfficial(){
   await persist('incidents');
   toast('Published', 'Official update added to incident timeline.', '📣');
   setView('org-comms');
-}
+});}
 
 /* expose */
 Object.assign(window, {setRole,setView,toggleFilter,openIncident,confirmIncident,advanceIncident,openCaseFor,openProvider,
