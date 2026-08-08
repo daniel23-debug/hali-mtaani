@@ -379,7 +379,11 @@ function startPollingFallback(){
       if(results.some(r=>r.failed)) return; // don't overwrite good local data with a failed fetch
       const [incidents, providers, bookings, alerts, cases, orgs] = results;
       data = {incidents:incidents.rows, providers:providers.rows, bookings:bookings.rows, alerts:alerts.rows, cases:cases.rows, orgs:orgs.rows};
-      renderContent();
+      // Don't yank the form out from under someone actively typing — the data is still
+      // updated above so it's current the moment they do interact, just don't re-render yet.
+      const ae = document.activeElement;
+      const isTyping = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA') && document.getElementById('content')?.contains(ae);
+      if(!isTyping) renderContent();
     }catch(e){ console.warn('Background sync poll failed', e); }
   }, 15000); // every 15s — catches up even if realtime push never arrives
 }
@@ -399,7 +403,9 @@ function subscribeRealtime(){
           const idx = arr.findIndex(r=>r.id===payload.new.id);
           if(idx>-1) arr[idx] = payload.new; else arr.unshift(payload.new);
         }
-        renderContent();
+        const ae = document.activeElement;
+        const isTyping = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA') && document.getElementById('content')?.contains(ae);
+        if(!isTyping) renderContent();
       })
       .subscribe((status)=>{
         if(status==='SUBSCRIBED') console.log(`Realtime connected: ${key}`);
@@ -503,9 +509,38 @@ function renderContent(){
   const views = { feed:viewFeed, map:viewMap, services:viewServices, alerts:viewAlerts, bookings:viewBookings,
     report:viewReport, incident:viewIncident, provider:viewProvider, 'provider-register':viewProviderRegister,
     'org-dash':viewOrgDash, 'org-cases':viewOrgCases, 'org-comms':viewOrgComms, 'org-register':viewOrgRegister, 'case':viewCaseDetail };
-  destroyMaps();
-  c.innerHTML = (views[state.view] || viewFeed)();
-  initViewMaps();
+
+  // Background syncs (15s poll, realtime pushes) call this on a timer regardless of what the
+  // user is doing. Without this, a re-render mid-typing would blow away any unsaved form input.
+  // Snapshot values + focus/cursor first, rebuild the DOM, then restore them.
+  const activeEl = document.activeElement;
+  const activeId = (activeEl && c.contains(activeEl) && activeEl.id) ? activeEl.id : null;
+  const selStart = activeEl && 'selectionStart' in activeEl ? activeEl.selectionStart : null;
+  const selEnd = activeEl && 'selectionEnd' in activeEl ? activeEl.selectionEnd : null;
+  const preserved = {};
+  c.querySelectorAll('input[id], textarea[id], select[id]').forEach(node=>{ preserved[node.id] = node.value; });
+
+  try{
+    destroyMaps();
+    c.innerHTML = (views[state.view] || viewFeed)();
+  } finally {
+    // Restore unconditionally — even if something below (map init) throws, the user's typing must survive.
+    c.querySelectorAll('input[id], textarea[id], select[id]').forEach(node=>{
+      if(preserved[node.id] !== undefined) node.value = preserved[node.id];
+    });
+    if(activeId){
+      const toFocus = document.getElementById(activeId);
+      if(toFocus){
+        toFocus.focus();
+        if(selStart!==null && selEnd!==null && toFocus.setSelectionRange){
+          try{ toFocus.setSelectionRange(selStart, selEnd); }catch(e){}
+        }
+      }
+    }
+  }
+
+  // Map init is separated and isolated: a Leaflet hiccup here must never wipe the form above.
+  try{ initViewMaps(); }catch(e){ console.warn('Map init failed', e); }
 }
 
 /* ---------------- SHARED UI PIECES ---------------- */
