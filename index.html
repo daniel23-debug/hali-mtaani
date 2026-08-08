@@ -214,11 +214,16 @@ async function loadCollection(key){
   }
 }
 async function saveCollection(key, arr){
-  if(!supabase) return;
+  if(!supabase) return {ok:false, reason:'no-client'};
   try{
-    if(arr.length > 0) await supabase.from(key).upsert(arr, {onConflict:'id'});
-  }catch(e){ 
-    console.log(`Save ${key} skipped`, e);
+    if(arr.length > 0){
+      const { error } = await supabase.from(key).upsert(arr, {onConflict:'id'});
+      if(error) throw error; // supabase-js doesn't throw on its own — RLS/policy failures land here
+    }
+    return {ok:true};
+  }catch(e){
+    console.warn(`Save ${key} failed`, e);
+    return {ok:false, error:e};
   }
 }
 
@@ -407,8 +412,12 @@ function subscribeRealtime(){
 
 async function persist(key){
   state.saving = true; updateSyncDot();
-  await saveCollection(KEYS[key], data[key]);
+  const result = await saveCollection(KEYS[key], data[key]);
   state.saving = false; updateSyncDot();
+  if(!result.ok){
+    toast('Not saved', "This didn't save to the server (permissions or connection issue) — it will disappear on refresh unless you fix that and try again.", '⚠️');
+  }
+  return result.ok;
 }
 function updateSyncDot(){
   const dot = document.getElementById('sync-dot');
@@ -769,9 +778,9 @@ async function submitProvider(){ return guardOnce('submitProvider', async ()=>{
     price:document.getElementById('pv-price').value.trim(), verified:false,
     lat:pinCoords.pv.lat, lng:pinCoords.pv.lng, createdAt:now()};
   data.providers.unshift(p);
-  await persist('providers');
+  const saved = await persist('providers');
   pinCoords.pv = null;
-  toast('Provider registered', 'Your listing is live and marked unverified.', '✅');
+  if(saved) toast('Provider registered', 'Your listing is live and marked unverified.', '✅');
   setView('services');
 });}
 function openProvider(id){ state.selectedProvider=id; setView('provider'); }
@@ -799,8 +808,8 @@ async function requestBooking(pid){ return guardOnce('requestBooking:'+pid, asyn
   const requester = document.getElementById('bk-name').value.trim() || 'Anonymous resident';
   const b = {id:uid('bk'), providerId:pid, providerName:p.name, desc, requester, status:'pending', time:now()};
   data.bookings.unshift(b);
-  await persist('bookings');
-  toast('Request sent', `${p.name} has been notified.`, '📩');
+  const saved = await persist('bookings');
+  if(saved) toast('Request sent', `${p.name} has been notified.`, '📩');
   setView('bookings');
 });}
 function viewBookings(){
@@ -814,8 +823,8 @@ async function acceptBooking(id){ return guardOnce('acceptBooking:'+id, async ()
   const b = data.bookings.find(b=>b.id===id);
   if(!b || b.status==='accepted') return;
   b.status='accepted';
-  await persist('bookings');
-  toast('Booking accepted', `${b.providerName} accepted the request.`, '✅');
+  const saved = await persist('bookings');
+  if(saved) toast('Booking accepted', `${b.providerName} accepted the request.`, '✅');
   renderContent();
 });}
 
@@ -856,8 +865,8 @@ async function submitReport(){ return guardOnce('submitReport', async ()=>{
     timeline:[{time:now(), text:'Report submitted.', source:'community', by:reportedBy}],
   };
   data.incidents.unshift(inc);
-  await persist('incidents');
-  toast('Report submitted', 'Your incident is now live.', '📝');
+  const saved = await persist('incidents');
+  if(saved) toast('Report submitted', 'Your incident is now live.', '📝');
   pickedSeverity='medium'; pinCoords.rp=null;
   openIncident(inc.id);
 });}
@@ -888,8 +897,8 @@ async function submitOrg(){ return guardOnce('submitOrg', async ()=>{
   if(!name){ toast('Missing info','Organization name required.','⚠️'); return; }
   const sector = document.getElementById('org-sector').value.trim();
   data.orgs.unshift({id:uid('org'), name, sector, verified:false, createdAt:now()});
-  await persist('orgs');
-  toast('Organization registered', 'Unverified until confirmed by Hali Mtaani.', '✅');
+  const saved = await persist('orgs');
+  if(saved) toast('Organization registered', 'Unverified until confirmed by Hali Mtaani.', '✅');
   setView('org-dash');
 });}
 function viewOrgDash(){
@@ -934,8 +943,8 @@ async function postOfficial(){ return guardOnce('postOfficial', async ()=>{
   if(!text){ toast('Missing info','Write a message first.','⚠️'); return; }
   const inc = data.incidents.find(i=>i.id===id);
   inc.timeline.push({time:now(), text, source:'official', by:activeOrgName()});
-  await persist('incidents');
-  toast('Published', 'Official update added to incident timeline.', '📣');
+  const saved = await persist('incidents');
+  if(saved) toast('Published', 'Official update added to incident timeline.', '📣');
   setView('org-comms');
 });}
 
