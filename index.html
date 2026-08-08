@@ -222,17 +222,33 @@ function requestGeolocation(onDone){
     updateLocationPill(); if(onDone) onDone(null);
     return;
   }
-  navigator.geolocation.getCurrentPosition(async (pos)=>{
+  if(window.isSecureContext===false){
+    state.locationStatus='unavailable';
+    state.locationLabel='Needs HTTPS to locate you';
+    updateLocationPill(); if(onDone) onDone(null);
+    return;
+  }
+  const onSuccess = async (pos)=>{
     const coords = {lat:pos.coords.latitude, lng:pos.coords.longitude};
     state.userCoords = coords; state.locationStatus='ok';
     await reverseGeocode(coords);
     if(onDone) onDone(coords);
-  }, (err)=>{
-    state.locationStatus = err.code===1 ? 'denied' : 'unavailable';
-    state.locationLabel = err.code===1 ? 'Location permission denied' : 'Location unavailable';
-    updateLocationPill();
-    if(onDone) onDone(null);
-  }, {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
+  };
+  navigator.geolocation.getCurrentPosition(onSuccess, (err)=>{
+    if(err.code===1){
+      state.locationStatus='denied'; state.locationLabel='Location permission denied';
+      updateLocationPill(); if(onDone) onDone(null);
+      return;
+    }
+    // High-accuracy fix failed (common on desktops with no GPS, or weak signal indoors).
+    // Retry once with low accuracy and a longer timeout before giving up.
+    navigator.geolocation.getCurrentPosition(onSuccess, (err2)=>{
+      state.locationStatus = err2.code===1 ? 'denied' : 'unavailable';
+      state.locationLabel = err2.code===1 ? 'Location permission denied' : 'Location unavailable — check your device/OS location settings';
+      updateLocationPill();
+      if(onDone) onDone(null);
+    }, {enableHighAccuracy:false, timeout:20000, maximumAge:60000});
+  }, {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
 }
 async function reverseGeocode(coords){
   try{
