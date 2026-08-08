@@ -180,17 +180,17 @@ if(window.supabase) {
 const KEYS = {incidents:'incidents', providers:'providers', bookings:'bookings', alerts:'alerts', cases:'cases', orgs:'orgs'};
 
 async function loadCollection(key){
-  if(!supabase) return [];
+  if(!supabase) return {rows:[], failed:true};
   try{
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     const { data, error } = await supabase.from(key).select('*');
     clearTimeout(timeout);
     if(error) throw error;
-    return data || [];
-  }catch(e){ 
-    console.log(`Load ${key} skipped`);
-    return [];
+    return {rows: data || [], failed:false};
+  }catch(e){
+    console.warn(`Load ${key} failed`, e);
+    return {rows:[], failed:true};
   }
 }
 async function saveCollection(key, arr){
@@ -200,6 +200,16 @@ async function saveCollection(key, arr){
   }catch(e){ 
     console.log(`Save ${key} skipped`, e);
   }
+}
+
+/* ---------------- DEVICE ID (anonymous, persistent, used to prevent duplicate confirmations) ---------------- */
+function getDeviceId(){
+  let id = localStorage.getItem('hm_device_id');
+  if(!id){
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'dev-'+Date.now()+'-'+Math.random().toString(16).slice(2));
+    localStorage.setItem('hm_device_id', id);
+  }
+  return id;
 }
 
 const state = {
@@ -216,6 +226,7 @@ const state = {
 /* ---------------- REAL GEOLOCATION ---------------- */
 const NAIROBI_FALLBACK = {lat:-1.2921, lng:36.8219};
 
+let geoWatchId = null;
 function requestGeolocation(onDone){
   if(!('geolocation' in navigator)){
     state.locationStatus='unavailable'; state.locationLabel='Location not supported';
@@ -223,46 +234,63 @@ function requestGeolocation(onDone){
     return;
   }
   if(window.isSecureContext===false){
-    state.locationStatus='unavailable';
-    state.locationLabel='Needs HTTPS to locate you';
+    state.locationStatus='unavailable'; state.locationLabel='Needs HTTPS to locate you';
     updateLocationPill(); if(onDone) onDone(null);
     return;
   }
-  const onSuccess = async (pos)=>{
-    const coords = {lat:pos.coords.latitude, lng:pos.coords.longitude};
-    state.userCoords = coords; state.locationStatus='ok';
-    await reverseGeocode(coords);
+  if(geoWatchId!==null){ navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+  state.locationStatus='pending'; state.locationLabel='Locating…'; updateLocationPill();
+
+  let bestCoords=null, bestAccuracy=Infinity, settled=false;
+  const finish = async (coords, accuracy)=>{
+    if(settled) return; settled=true;
+    if(geoWatchId!==null){ navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+    if(coords){
+      state.userCoords=coords; state.userAccuracy=accuracy; state.locationStatus='ok';
+      await reverseGeocode(coords);
+    }
     if(onDone) onDone(coords);
   };
-  navigator.geolocation.getCurrentPosition(onSuccess, (err)=>{
+
+  geoWatchId = navigator.geolocation.watchPosition((pos)=>{
+    const coords = {lat:pos.coords.latitude, lng:pos.coords.longitude};
+    const accuracy = pos.coords.accuracy; // meters — lower is better
+    if(accuracy < bestAccuracy){ bestAccuracy = accuracy; bestCoords = coords; }
+    // A GPS-grade fix (<=50m) is good enough to stop waiting immediately.
+    if(accuracy <= 50) finish(coords, accuracy);
+  }, (err)=>{
     if(err.code===1){
       state.locationStatus='denied'; state.locationLabel='Location permission denied';
-      updateLocationPill(); if(onDone) onDone(null);
-      return;
+      updateLocationPill(); finish(null);
     }
-    // High-accuracy fix failed (common on desktops with no GPS, or weak signal indoors).
-    // Retry once with low accuracy and a longer timeout before giving up.
-    navigator.geolocation.getCurrentPosition(onSuccess, (err2)=>{
-      state.locationStatus = err2.code===1 ? 'denied' : 'unavailable';
-      state.locationLabel = err2.code===1 ? 'Location permission denied' : 'Location unavailable — check your device/OS location settings';
-      updateLocationPill();
-      if(onDone) onDone(null);
-    }, {enableHighAccuracy:false, timeout:20000, maximumAge:60000});
-  }, {enableHighAccuracy:true, timeout:8000, maximumAge:60000});
+    // Other errors (timeout/unavailable) during watch: keep waiting for the deadline below,
+    // since watchPosition can recover after transient failures.
+  }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+
+  // Deadline: after 12s, accept the best fix seen so far (even if coarse) rather than failing outright.
+  setTimeout(()=>{
+    if(settled) return;
+    if(bestCoords) finish(bestCoords, bestAccuracy);
+    else {
+      state.locationStatus='unavailable';
+      state.locationLabel='Location unavailable — check device GPS/location settings';
+      updateLocationPill(); finish(null);
+    }
+  }, 12000);
 }
 async function reverseGeocode(coords){
   try{
     const controller = new AbortController();
     const timeout = setTimeout(()=>controller.abort(), 6000);
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=14&addressdetails=1`, {signal:controller.signal, headers:{'Accept':'application/json'}});
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=16&addressdetails=1`, {signal:controller.signal, headers:{'Accept':'application/json'}});
     clearTimeout(timeout);
     const j = await res.json();
     const a = j.address || {};
-    const area = a.suburb || a.neighbourhood || a.town || a.city_district || a.village || a.city || 'Nearby area';
+    const area = a.suburb || a.neighbourhood || a.road || a.town || a.city_district || a.village || a.city || 'Nearby area';
     const city = a.city || a.town || a.county || '';
     state.locationLabel = city && city!==area ? `${area}, ${city}` : area;
   }catch(e){
-    state.locationLabel = `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}`;
+    state.locationLabel = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
   }
   updateLocationPill();
 }
@@ -279,19 +307,50 @@ async function loadAll(){
       loadCollection(KEYS.incidents), loadCollection(KEYS.providers), loadCollection(KEYS.bookings),
       loadCollection(KEYS.alerts), loadCollection(KEYS.cases), loadCollection(KEYS.orgs),
     ]);
-    
-    const timeoutPromise = new Promise((resolve) => 
-      setTimeout(() => resolve([[], [], [], [], [], []]), 8000)
+
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve(null), 8000)
     );
-    
-    const [incidents, providers, bookings, alerts, cases, orgs] = await Promise.race([loadPromise, timeoutPromise]);
-    data = {incidents, providers, bookings, alerts, cases, orgs};
+
+    const results = await Promise.race([loadPromise, timeoutPromise]);
+    if(results){
+      const [incidents, providers, bookings, alerts, cases, orgs] = results;
+      data = {incidents:incidents.rows, providers:providers.rows, bookings:bookings.rows, alerts:alerts.rows, cases:cases.rows, orgs:orgs.rows};
+      if(results.some(r=>r.failed)){
+        toast('Sync issue', "Couldn't load some live data — you may be seeing an outdated view. Try refreshing.", '⚠️');
+      }
+    } else {
+      toast('Connection timed out', "Couldn't reach the live database in time — showing an empty view. Try refreshing.", '⚠️');
+    }
   } catch (e) {
-    console.log('Load failed, starting with empty data');
+    console.warn('Load failed, starting with empty data', e);
+    toast('Connection issue', "Couldn't load live data — try refreshing.", '⚠️');
   }
   state.loading = false;
   render();
   requestGeolocation();
+  subscribeRealtime();
+}
+
+/* ---------------- REALTIME SYNC (pushes changes from any device to every other open device) ---------------- */
+function subscribeRealtime(){
+  if(!supabase) return;
+  Object.values(KEYS).forEach(key=>{
+    supabase.channel(`public:${key}`)
+      .on('postgres_changes', {event:'*', schema:'public', table:key}, (payload)=>{
+        const arr = data[key];
+        if(!arr) return;
+        if(payload.eventType==='DELETE'){
+          const idx = arr.findIndex(r=>r.id===payload.old.id);
+          if(idx>-1) arr.splice(idx,1);
+        } else {
+          const idx = arr.findIndex(r=>r.id===payload.new.id);
+          if(idx>-1) arr[idx] = payload.new; else arr.push(payload.new);
+        }
+        renderContent();
+      })
+      .subscribe();
+  });
 }
 
 async function persist(key){
@@ -336,7 +395,7 @@ function render(){
     </div>
     <div class="main">
       <div class="topbar">
-        <div class="location-pill"><span class="dot-live ${state.locationStatus==='pending'?'saving':''}" id="sync-dot-2"></span> <span id="location-pill-text">${escapeHtml(state.locationLabel)}</span></div>
+        <div class="location-pill" style="cursor:pointer;" title="Tap to refresh your location" onclick="requestGeolocation(()=>renderContent())"><span class="dot-live ${state.locationStatus==='pending'?'saving':''}" id="sync-dot-2"></span> <span id="location-pill-text">${escapeHtml(state.locationLabel)}</span></div>
         <div class="search-bar"><span>🔎</span><input placeholder="Search incidents or services..." onkeydown="if(event.key==='Enter'){setView('services'); this.blur();}"></div>
         <div class="topbar-right">
           <button class="icon-btn" onclick="setView('alerts')">🔔${data.alerts.some(a=>!a.read)?'<span class="ping"></span>':''}</button>
@@ -466,6 +525,14 @@ function initMainMap(){
   if(state.userCoords){
     const youIcon = L.divIcon({html:`<div class="lf-pin-you"></div>`, className:'', iconSize:[16,16], iconAnchor:[8,8]});
     L.marker([state.userCoords.lat, state.userCoords.lng], {icon:youIcon}).addTo(mainMap).bindTooltip('You are here');
+    if(state.userAccuracy){
+      L.circle([state.userCoords.lat, state.userCoords.lng], {radius:state.userAccuracy, color:'#5C86A8', weight:1, fillColor:'#5C86A8', fillOpacity:0.12}).addTo(mainMap);
+    }
+    // If the map was drawn before geolocation resolved, recenter now that we have a real fix.
+    if(!state.userAccuracy || state.userAccuracy > 2000){
+      // very coarse fix (>2km) — zoom out slightly so the accuracy circle stays visible/honest
+      mainMap.setView([state.userCoords.lat, state.userCoords.lng], 11);
+    }
   }
 }
 
@@ -516,6 +583,7 @@ function viewIncident(){
   const inc = data.incidents.find(i=>i.id===state.selectedIncident);
   if(!inc) return `<div class="empty-state">Incident not found.</div>`;
   const linkedCase = data.cases.find(c=>c.incidentId===inc.id);
+  const alreadyConfirmedByMe = Array.isArray(inc.confirmedBy) && inc.confirmedBy.includes(getDeviceId());
   return `
     <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="setView(state.role==='org'?'org-cases':'feed')">← Back</button>
     <div class="page-head"><div><div class="page-title">${escapeHtml(inc.title)}</div><div class="page-sub">${inc.category} · Reported ${fmtAgo(inc.createdAt)} by ${escapeHtml(inc.reportedBy||'Anonymous resident')} · Severity <b style="color:${severityColor(inc.severity)}">${inc.severity}</b></div></div>${statusBadge(inc.status)}</div>
@@ -525,7 +593,7 @@ function viewIncident(){
         ${confidenceBadge(inc)}
         <div style="margin-top:14px; font-size:12.5px; color:var(--paper-dim); line-height:1.6;">This is a community report, not confirmed fact, until independently corroborated.</div>
         <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="confirmIncident('${inc.id}')" ${state.role!=='resident'?'disabled':''}>✓ I can confirm this</button>
+          <button class="btn btn-primary" onclick="confirmIncident('${inc.id}')" ${state.role!=='resident'||alreadyConfirmedByMe?'disabled':''}>${alreadyConfirmedByMe?'✓ You confirmed this':'✓ I can confirm this'}</button>
         </div>
         ${state.role==='org' ? orgIncidentActions(inc, linkedCase) : ''}
       </div>
@@ -557,6 +625,14 @@ function orgIncidentActions(inc, linkedCase){
 }
 async function confirmIncident(id){
   const inc = data.incidents.find(i=>i.id===id);
+  if(!inc) return;
+  if(!Array.isArray(inc.confirmedBy)) inc.confirmedBy = [];
+  const me = getDeviceId();
+  if(inc.confirmedBy.includes(me)){
+    toast('Already confirmed', 'You already confirmed this incident — one confirmation per device.', 'ℹ️');
+    return;
+  }
+  inc.confirmedBy.push(me);
   inc.confirmations += 1;
   inc.confidence = Math.min(96, inc.confidence + 6);
   inc.timeline.push({time:now(), text:'A resident confirmed this incident. Confidence updated.', source:'community', by:'Resident confirmation'});
