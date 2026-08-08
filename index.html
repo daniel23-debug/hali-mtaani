@@ -246,6 +246,11 @@ async function guardOnce(key, fn){
   finally{ inFlightActions.delete(key); }
 }
 
+// Views with form fields the user might be mid-typing in. Background syncs must never
+// auto-redraw these — the underlying `data` still gets refreshed, it just won't touch the
+// screen until the user navigates away on their own.
+const FORM_VIEWS = new Set(['report','provider-register','org-register','org-comms','provider']);
+
 const state = {
   loading:true,
   role:'resident', view:'feed',
@@ -379,11 +384,9 @@ function startPollingFallback(){
       if(results.some(r=>r.failed)) return; // don't overwrite good local data with a failed fetch
       const [incidents, providers, bookings, alerts, cases, orgs] = results;
       data = {incidents:incidents.rows, providers:providers.rows, bookings:bookings.rows, alerts:alerts.rows, cases:cases.rows, orgs:orgs.rows};
-      // Don't yank the form out from under someone actively typing — the data is still
-      // updated above so it's current the moment they do interact, just don't re-render yet.
-      const ae = document.activeElement;
-      const isTyping = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA') && document.getElementById('content')?.contains(ae);
-      if(!isTyping) renderContent();
+      // Data is refreshed above either way — but never redraw the screen out from under
+      // someone filling out a form. It'll reflect the fresh data next time they navigate.
+      if(!FORM_VIEWS.has(state.view)) renderContent();
     }catch(e){ console.warn('Background sync poll failed', e); }
   }, 15000); // every 15s — catches up even if realtime push never arrives
 }
@@ -403,9 +406,7 @@ function subscribeRealtime(){
           const idx = arr.findIndex(r=>r.id===payload.new.id);
           if(idx>-1) arr[idx] = payload.new; else arr.unshift(payload.new);
         }
-        const ae = document.activeElement;
-        const isTyping = ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA') && document.getElementById('content')?.contains(ae);
-        if(!isTyping) renderContent();
+        if(!FORM_VIEWS.has(state.view)) renderContent();
       })
       .subscribe((status)=>{
         if(status==='SUBSCRIBED') console.log(`Realtime connected: ${key}`);
