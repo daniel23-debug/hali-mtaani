@@ -359,6 +359,24 @@ async function loadAll(){
   render();
   requestGeolocation();
   subscribeRealtime();
+  startPollingFallback();
+}
+
+/* ---------------- POLLING FALLBACK (safety net if the WebSocket/Realtime connection is blocked or drops) ---------------- */
+function startPollingFallback(){
+  setInterval(async ()=>{
+    if(!supabase) return;
+    try{
+      const results = await Promise.all([
+        loadCollection(KEYS.incidents), loadCollection(KEYS.providers), loadCollection(KEYS.bookings),
+        loadCollection(KEYS.alerts), loadCollection(KEYS.cases), loadCollection(KEYS.orgs),
+      ]);
+      if(results.some(r=>r.failed)) return; // don't overwrite good local data with a failed fetch
+      const [incidents, providers, bookings, alerts, cases, orgs] = results;
+      data = {incidents:incidents.rows, providers:providers.rows, bookings:bookings.rows, alerts:alerts.rows, cases:cases.rows, orgs:orgs.rows};
+      renderContent();
+    }catch(e){ console.warn('Background sync poll failed', e); }
+  }, 15000); // every 15s — catches up even if realtime push never arrives
 }
 
 /* ---------------- REALTIME SYNC (pushes changes from any device to every other open device) ---------------- */
@@ -374,11 +392,16 @@ function subscribeRealtime(){
           if(idx>-1) arr.splice(idx,1);
         } else {
           const idx = arr.findIndex(r=>r.id===payload.new.id);
-          if(idx>-1) arr[idx] = payload.new; else arr.push(payload.new);
+          if(idx>-1) arr[idx] = payload.new; else arr.unshift(payload.new);
         }
         renderContent();
       })
-      .subscribe();
+      .subscribe((status)=>{
+        if(status==='SUBSCRIBED') console.log(`Realtime connected: ${key}`);
+        else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
+          console.warn(`Realtime failed for ${key} (${status}) — relying on 15s polling fallback instead.`);
+        }
+      });
   });
 }
 
