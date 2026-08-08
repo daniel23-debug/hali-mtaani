@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hali Mtaani</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
 <style>
 :root{
   --ink:#14181B; --ink-2:#1D2226; --ink-3:#262C30;
@@ -86,17 +88,25 @@ a{color:inherit;} button{font-family:inherit; cursor:pointer;}
 .feed-title{ font-weight:600; font-size:14px; } .feed-meta{ font-family:var(--font-mono); font-size:10.5px; color:var(--paper-dim); }
 .feed-desc{ font-size:12.5px; color:var(--paper-dim); line-height:1.5; margin-top:2px;}
 .feed-foot{ display:flex; align-items:center; gap:14px; margin-top:10px; flex-wrap:wrap;}
-.map-wrap{ position:relative; height:calc(100vh - 220px); min-height:420px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line); cursor:crosshair;
-  background: repeating-linear-gradient(0deg, rgba(239,233,221,.035) 0 1px, transparent 1px 42px), repeating-linear-gradient(90deg, rgba(239,233,221,.035) 0 1px, transparent 1px 42px), var(--ink-2);}
-.map-wrap.static{ cursor:default; }
-.pin{ position:absolute; width:30px; height:30px; border-radius:50% 50% 50% 0; transform:translate(-50%,-100%) rotate(-45deg); display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.4); border:2px solid var(--ink);}
-.pin span{ transform:rotate(45deg); font-size:13px; }
-.map-filters{ position:absolute; top:14px; left:14px; display:flex; gap:6px; flex-wrap:wrap; max-width:70%;}
-.filter-chip{ font-family:var(--font-mono); font-size:10.5px; padding:5px 10px; border-radius:20px; border:1px solid var(--line-strong); background:rgba(20,24,27,.8); backdrop-filter:blur(4px); color:var(--paper-dim);}
+.map-wrap{ position:relative; height:calc(100vh - 220px); min-height:420px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line); background:var(--ink-2);}
+.leaflet-container{ background:var(--ink-2) !important; font-family:var(--font-body); }
+.leaflet-tile-pane{ filter:invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip{ background:var(--ink-2); color:var(--paper); }
+.leaflet-control-zoom a{ background:var(--ink-2) !important; color:var(--paper) !important; border-color:var(--line-strong) !important; }
+.lf-pin{ width:30px; height:30px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,.4); border:2px solid var(--ink);}
+.lf-pin span{ transform:rotate(45deg); font-size:13px; display:block; }
+.lf-pin-mini{ width:22px; height:22px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid var(--ink); background:var(--murram); box-shadow:0 3px 8px rgba(0,0,0,.4);}
+.lf-pin-you{ width:16px; height:16px; border-radius:50%; background:var(--sky); border:3px solid var(--ink); box-shadow:0 0 0 4px rgba(92,134,168,.3);}
+.map-filters{ position:absolute; top:14px; left:14px; z-index:1000; display:flex; gap:6px; flex-wrap:wrap; max-width:60%;}
+.filter-chip{ font-family:var(--font-mono); font-size:10.5px; padding:5px 10px; border-radius:20px; border:1px solid var(--line-strong); background:rgba(20,24,27,.8); backdrop-filter:blur(4px); color:var(--paper-dim); cursor:pointer;}
 .filter-chip.on{ background:var(--murram); color:var(--paper); border-color:var(--murram);}
-.map-legend{ position:absolute; bottom:14px; left:14px; background:rgba(20,24,27,.85); backdrop-filter:blur(4px); border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; font-size:11px; display:flex; gap:12px; flex-wrap:wrap;}
+.map-legend{ position:absolute; bottom:14px; left:14px; z-index:1000; background:rgba(20,24,27,.85); backdrop-filter:blur(4px); border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; font-size:11px; display:flex; gap:12px; flex-wrap:wrap;}
 .legend-item{ display:flex; align-items:center; gap:6px; color:var(--paper-dim);} .legend-dot{ width:8px; height:8px; border-radius:50%;}
-.map-hint{ position:absolute; top:14px; right:14px; }
+.map-hint{ position:absolute; top:14px; right:14px; z-index:1000; }
+.locate-btn{ z-index:1000; background:var(--ink-2); border:1px solid var(--line-strong); color:var(--paper); border-radius:9px; padding:8px 12px; font-size:11.5px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer; font-family:var(--font-body);}
+.locate-btn:hover{ border-color:var(--murram); }
+.locate-btn.locating{ opacity:.6; cursor:wait; }
+.geo-status{ font-family:var(--font-mono); font-size:10.5px; color:var(--paper-dim); margin-top:6px; display:flex; align-items:center; gap:6px; }
 .timeline{ position:relative; padding-left:22px; } .timeline::before{ content:''; position:absolute; left:5px; top:4px; bottom:4px; width:1px; background:var(--line-strong);}
 .tl-item{ position:relative; padding-bottom:20px;} .tl-item:last-child{ padding-bottom:0;}
 .tl-dot{ position:absolute; left:-22px; top:2px; width:11px; height:11px; border-radius:50%; border:2px solid var(--ink-2);}
@@ -116,9 +126,7 @@ a{color:inherit;} button{font-family:inherit; cursor:pointer;}
 .mobile-tabbar{ display:none; }
 .empty-state{ text-align:center; padding:50px 20px; color:var(--paper-dim); }
 .empty-state .e-icon{ font-size:30px; margin-bottom:10px; }
-.mini-map{ position:relative; height:160px; border-radius:10px; border:1px solid var(--line-strong); cursor:crosshair; margin-bottom:6px;
-  background: repeating-linear-gradient(0deg, rgba(239,233,221,.035) 0 1px, transparent 1px 30px), repeating-linear-gradient(90deg, rgba(239,233,221,.035) 0 1px, transparent 1px 30px), var(--ink-3);}
-.mini-pin{ position:absolute; width:20px; height:20px; border-radius:50% 50% 50% 0; transform:translate(-50%,-100%) rotate(-45deg); background:var(--murram); border:2px solid var(--ink);}
+.mini-map{ position:relative; height:200px; border-radius:10px; border:1px solid var(--line-strong); margin-bottom:6px; overflow:hidden; background:var(--ink-3);}
 .hint{ font-size:11px; color:var(--paper-dim); margin-top:4px; }
 .spinner-wrap{ display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; width:100%; gap:14px; color:var(--paper-dim);}
 .spinner{ width:26px; height:26px; border-radius:50%; border:3px solid var(--ink-3); border-top-color:var(--murram); animation:spin .8s linear infinite;}
@@ -188,10 +196,9 @@ async function loadCollection(key){
 async function saveCollection(key, arr){
   if(!supabase) return;
   try{
-    await supabase.from(key).delete().neq('id', '');
-    if(arr.length > 0) await supabase.from(key).insert(arr);
+    if(arr.length > 0) await supabase.from(key).upsert(arr, {onConflict:'id'});
   }catch(e){ 
-    console.log(`Save ${key} skipped`);
+    console.log(`Save ${key} skipped`, e);
   }
 }
 
@@ -200,9 +207,53 @@ const state = {
   role:'resident', view:'feed',
   selectedIncident:null, selectedProvider:null, selectedCase:null,
   mapFilters:{incident:true, service:true},
-  reportPin:{x:50,y:50},
   saving:false,
+  userCoords:null,        // {lat,lng} from real device GPS, once granted
+  locationLabel:'Locating…',
+  locationStatus:'pending', // pending | ok | denied | unavailable
 };
+
+/* ---------------- REAL GEOLOCATION ---------------- */
+const NAIROBI_FALLBACK = {lat:-1.2921, lng:36.8219};
+
+function requestGeolocation(onDone){
+  if(!('geolocation' in navigator)){
+    state.locationStatus='unavailable'; state.locationLabel='Location not supported';
+    updateLocationPill(); if(onDone) onDone(null);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async (pos)=>{
+    const coords = {lat:pos.coords.latitude, lng:pos.coords.longitude};
+    state.userCoords = coords; state.locationStatus='ok';
+    await reverseGeocode(coords);
+    if(onDone) onDone(coords);
+  }, (err)=>{
+    state.locationStatus = err.code===1 ? 'denied' : 'unavailable';
+    state.locationLabel = err.code===1 ? 'Location permission denied' : 'Location unavailable';
+    updateLocationPill();
+    if(onDone) onDone(null);
+  }, {enableHighAccuracy:true, timeout:10000, maximumAge:60000});
+}
+async function reverseGeocode(coords){
+  try{
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>controller.abort(), 6000);
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=14&addressdetails=1`, {signal:controller.signal, headers:{'Accept':'application/json'}});
+    clearTimeout(timeout);
+    const j = await res.json();
+    const a = j.address || {};
+    const area = a.suburb || a.neighbourhood || a.town || a.city_district || a.village || a.city || 'Nearby area';
+    const city = a.city || a.town || a.county || '';
+    state.locationLabel = city && city!==area ? `${area}, ${city}` : area;
+  }catch(e){
+    state.locationLabel = `${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)}`;
+  }
+  updateLocationPill();
+}
+function updateLocationPill(){
+  const el = document.getElementById('location-pill-text');
+  if(el) el.textContent = state.locationLabel;
+}
 
 let data = { incidents:[], providers:[], bookings:[], alerts:[], cases:[], orgs:[] };
 
@@ -224,6 +275,7 @@ async function loadAll(){
   }
   state.loading = false;
   render();
+  requestGeolocation();
 }
 
 async function persist(key){
@@ -268,7 +320,7 @@ function render(){
     </div>
     <div class="main">
       <div class="topbar">
-        <div class="location-pill"><span class="dot-live" id="sync-dot-2"></span> Nairobi, KE</div>
+        <div class="location-pill"><span class="dot-live ${state.locationStatus==='pending'?'saving':''}" id="sync-dot-2"></span> <span id="location-pill-text">${escapeHtml(state.locationLabel)}</span></div>
         <div class="search-bar"><span>🔎</span><input placeholder="Search incidents or services..." onkeydown="if(event.key==='Enter'){setView('services'); this.blur();}"></div>
         <div class="topbar-right">
           <button class="icon-btn" onclick="setView('alerts')">🔔${data.alerts.some(a=>!a.read)?'<span class="ping"></span>':''}</button>
@@ -315,7 +367,9 @@ function renderContent(){
   const views = { feed:viewFeed, map:viewMap, services:viewServices, alerts:viewAlerts, bookings:viewBookings,
     report:viewReport, incident:viewIncident, provider:viewProvider, 'provider-register':viewProviderRegister,
     'org-dash':viewOrgDash, 'org-cases':viewOrgCases, 'org-comms':viewOrgComms, 'org-register':viewOrgRegister, 'case':viewCaseDetail };
+  destroyMaps();
   c.innerHTML = (views[state.view] || viewFeed)();
+  initViewMaps();
 }
 
 /* ---------------- SHARED UI PIECES ---------------- */
@@ -354,24 +408,91 @@ function feedCard(inc){
 }
 function escapeHtml(s){ const d=document.createElement('div'); d.innerText=s||''; return d.innerHTML; }
 
-/* ---------------- MAP ---------------- */
+/* ---------------- MAP (real, Leaflet + OpenStreetMap) ---------------- */
+let mainMap = null, miniMaps = {}, pinCoords = {rp:null, pv:null};
+
 function viewMap(){
   const showIncidents = state.mapFilters.incident ? data.incidents : [];
   const showProviders = state.mapFilters.service ? data.providers : [];
   const empty = !showIncidents.length && !showProviders.length;
   return `
-    <div class="page-head"><div><div class="page-title">Map</div><div class="page-sub">Pins are placed where reporters and providers marked them.</div></div></div>
-    <div class="map-wrap static">
+    <div class="page-head"><div><div class="page-title">Map</div><div class="page-sub">Real locations on an actual street map — pinned by reporters and providers.</div></div></div>
+    <div class="map-wrap">
+      <div id="leaflet-mainmap" style="position:absolute; inset:0;"></div>
       <div class="map-filters">${filterChip('incident','⚠️ Incidents')}${filterChip('service','🛠️ Services')}</div>
-      ${showIncidents.map(inc => `<div class="pin" style="left:${inc.lat}%; top:${inc.lng}%; background:${severityColor(inc.severity)};" onclick="openIncident('${inc.id}')" title="${escapeHtml(inc.title)}"><span>${catIcon[inc.category]||'!'}</span></div>`).join('')}
-      ${showProviders.map(p => `<div class="pin" style="left:${p.lat}%; top:${p.lng}%; background:var(--savanna);" onclick="openProvider('${p.id}')" title="${escapeHtml(p.name)}"><span>🔧</span></div>`).join('')}
-      ${empty ? `<div class="empty-state" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;"><div class="e-icon">🗺️</div>Nothing on the map yet — report an incident or register as a provider.</div>` : ''}
+      ${empty ? `<div class="empty-state" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:1000; pointer-events:none;"><div class="e-icon">🗺️</div>Nothing on the map yet — report an incident or register as a provider.</div>` : ''}
       <div class="map-legend"><div class="legend-item"><span class="legend-dot" style="background:var(--murram)"></span> High severity</div><div class="legend-item"><span class="legend-dot" style="background:var(--ochre)"></span> Medium</div><div class="legend-item"><span class="legend-dot" style="background:var(--savanna)"></span> Provider</div></div>
     </div>
   `;
 }
 function filterChip(key,label){ return `<button class="filter-chip ${state.mapFilters[key]?'on':''}" onclick="toggleFilter('${key}')">${label}</button>`; }
 function toggleFilter(key){ state.mapFilters[key]=!state.mapFilters[key]; renderContent(); }
+
+function initMainMap(){
+  const container = document.getElementById('leaflet-mainmap');
+  if(!container || typeof L==='undefined') return;
+  const center = state.userCoords || NAIROBI_FALLBACK;
+  mainMap = L.map(container, {zoomControl:true}).setView([center.lat, center.lng], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(mainMap);
+
+  const showIncidents = state.mapFilters.incident ? data.incidents : [];
+  const showProviders = state.mapFilters.service ? data.providers : [];
+  showIncidents.forEach(inc=>{
+    if(inc.lat==null || inc.lng==null) return;
+    const icon = L.divIcon({html:`<div class="lf-pin" style="background:${severityColor(inc.severity)}"><span>${catIcon[inc.category]||'!'}</span></div>`, className:'', iconSize:[30,30], iconAnchor:[15,30]});
+    L.marker([inc.lat, inc.lng], {icon}).addTo(mainMap).bindTooltip(inc.title).on('click', ()=>openIncident(inc.id));
+  });
+  showProviders.forEach(p=>{
+    if(p.lat==null || p.lng==null) return;
+    const icon = L.divIcon({html:`<div class="lf-pin" style="background:var(--savanna)"><span>🔧</span></div>`, className:'', iconSize:[30,30], iconAnchor:[15,30]});
+    L.marker([p.lat, p.lng], {icon}).addTo(mainMap).bindTooltip(p.name).on('click', ()=>openProvider(p.id));
+  });
+  if(state.userCoords){
+    const youIcon = L.divIcon({html:`<div class="lf-pin-you"></div>`, className:'', iconSize:[16,16], iconAnchor:[8,8]});
+    L.marker([state.userCoords.lat, state.userCoords.lng], {icon:youIcon}).addTo(mainMap).bindTooltip('You are here');
+  }
+}
+
+function initMiniMap(key){
+  const container = document.getElementById(key+'-map');
+  if(!container || typeof L==='undefined') return;
+  const start = pinCoords[key] || state.userCoords || NAIROBI_FALLBACK;
+  const map = L.map(container, {zoomControl:false, attributionControl:false}).setView([start.lat, start.lng], pinCoords[key] ? 16 : 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
+  let marker = null;
+  function setPin(latlng){
+    pinCoords[key] = {lat:latlng.lat, lng:latlng.lng};
+    const icon = L.divIcon({html:'<div class="lf-pin-mini"></div>', className:'', iconSize:[22,22], iconAnchor:[11,22]});
+    if(marker) marker.setLatLng(latlng); else marker = L.marker(latlng,{icon}).addTo(map);
+    const status = document.getElementById(key+'-geo-status');
+    if(status) status.textContent = `Pinned at ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
+  }
+  if(pinCoords[key]) setPin(L.latLng(pinCoords[key].lat, pinCoords[key].lng));
+  map.on('click', e=>setPin(e.latlng));
+  miniMaps[key] = map;
+}
+
+function useMyLocationFor(key){
+  const btn = document.getElementById(key+'-locate-btn');
+  if(btn) btn.classList.add('locating');
+  requestGeolocation((coords)=>{
+    if(btn) btn.classList.remove('locating');
+    if(!coords){ toast('Location unavailable', 'Could not get your device location — tap the map to place a pin manually.', '⚠️'); return; }
+    const map = miniMaps[key];
+    if(map){ map.setView([coords.lat, coords.lng], 16); map.fire('click', {latlng: L.latLng(coords.lat, coords.lng)}); }
+  });
+}
+
+function destroyMaps(){
+  if(mainMap){ mainMap.remove(); mainMap=null; }
+  Object.keys(miniMaps).forEach(k=>{ miniMaps[k].remove(); }); miniMaps={};
+}
+function initViewMaps(){
+  if(typeof L==='undefined'){ setTimeout(initViewMaps, 300); return; }
+  if(state.view==='map') initMainMap();
+  if(state.view==='report') initMiniMap('rp');
+  if(state.view==='provider-register') initMiniMap('pv');
+}
 
 /* ---------------- INCIDENT DETAIL ---------------- */
 function openIncident(id){ state.selectedIncident=id; setView('incident'); }
@@ -451,6 +572,16 @@ async function openCaseFor(incidentId){
   renderContent();
 }
 function activeOrgName(){ return data.orgs[0] ? data.orgs[0].name : 'Responding organization'; }
+function miniMapField(key, hintText){
+  return `<div class="field"><label>Location on map</label>
+    <div class="mini-map" id="${key}-map"></div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+      <div class="hint">${hintText}</div>
+      <button type="button" class="locate-btn" id="${key}-locate-btn" onclick="useMyLocationFor('${key}')">📍 Use my location</button>
+    </div>
+    <div class="geo-status" id="${key}-geo-status">${pinCoords[key] ? `Pinned at ${pinCoords[key].lat.toFixed(5)}, ${pinCoords[key].lng.toFixed(5)}` : 'No pin placed yet — tap the map or use your location'}</div>
+  </div>`;
+}
 
 /* ---------------- SERVICES / PROVIDERS ---------------- */
 function viewServices(){
@@ -477,29 +608,23 @@ function viewProviderRegister(){
       <div class="field"><label>Category</label><input id="pv-category" placeholder="e.g. Electrician, Plumber, Mechanic"></div>
       <div class="field"><label>Description</label><textarea id="pv-blurb" placeholder="What you offer, coverage area, experience"></textarea></div>
       <div class="field"><label>Starting price (optional)</label><input id="pv-price" placeholder="e.g. From KES 1,500"></div>
-      <div class="field"><label>Location on map</label><div class="mini-map" id="pv-map" onclick="placeMiniPin(event,'pv')"></div><div class="hint">Click to drop your approximate location.</div></div>
+      ${miniMapField('pv', 'Tap the map to drop your real location.')}
       <button class="btn btn-primary" onclick="submitProvider()">Register</button>
       <div style="margin-top:10px;"><span class="badge badge-pending">Unverified until confirmed by Hali Mtaani or a real organization</span></div>
     </div>
   `;
 }
-let miniPin = {pv:{x:50,y:50}, rp:{x:50,y:50}};
-function placeMiniPin(ev, key){
-  const rect = ev.currentTarget.getBoundingClientRect();
-  const x = ((ev.clientX-rect.left)/rect.width*100).toFixed(1);
-  const y = ((ev.clientY-rect.top)/rect.height*100).toFixed(1);
-  miniPin[key] = {x,y};
-  ev.currentTarget.innerHTML = `<div class="mini-pin" style="left:${x}%; top:${y}%;"></div>`;
-}
 async function submitProvider(){
   const name = document.getElementById('pv-name').value.trim();
   const category = document.getElementById('pv-category').value.trim();
   if(!name || !category){ toast('Missing info', 'Name and category are required.', '⚠️'); return; }
+  if(!pinCoords.pv){ toast('Missing location', 'Tap the map or use your location to set where you operate.', '⚠️'); return; }
   const p = {id:uid('p'), name, category, blurb:document.getElementById('pv-blurb').value.trim(),
     price:document.getElementById('pv-price').value.trim(), verified:false,
-    lat:miniPin.pv.x, lng:miniPin.pv.y, createdAt:now()};
+    lat:pinCoords.pv.lat, lng:pinCoords.pv.lng, createdAt:now()};
   data.providers.unshift(p);
   await persist('providers');
+  pinCoords.pv = null;
   toast('Provider registered', 'Your listing is live and marked unverified.', '✅');
   setView('services');
 }
@@ -555,7 +680,7 @@ function viewReport(){
       <div class="field"><label>Category</label><select id="rp-category"><option>Flooding</option><option>Transport</option><option>Utilities</option><option>Infrastructure</option><option>Safety</option><option>Other</option></select></div>
       <div class="field"><label>What happened?</label><textarea id="rp-desc" placeholder="Describe what you're seeing..."></textarea></div>
       <div class="field"><label>Your name (optional)</label><input id="rp-name" placeholder="Anonymous by default"></div>
-      <div class="field"><label>Location on map</label><div class="mini-map" id="rp-map" onclick="placeMiniPin(event,'rp')"></div><div class="hint">Click on the grid to mark where this is happening.</div></div>
+      ${miniMapField('rp', 'Tap the map to mark exactly where this is happening.')}
       <div class="field"><label>Severity</label><div class="severity-row">
         <div class="sev-opt" id="sev-low" onclick="pickSeverity('low')">Low</div>
         <div class="sev-opt on" id="sev-medium" onclick="pickSeverity('medium')">Medium</div>
@@ -572,18 +697,19 @@ async function submitReport(){
   const title = document.getElementById('rp-title').value.trim();
   const desc = document.getElementById('rp-desc').value.trim();
   if(!title){ toast('Missing info', 'Give the report a short title.', '⚠️'); return; }
+  if(!pinCoords.rp){ toast('Missing location', 'Tap the map or use your location to mark where this is happening.', '⚠️'); return; }
   const category = document.getElementById('rp-category').value;
   const reportedBy = document.getElementById('rp-name').value.trim() || 'Anonymous resident';
   const inc = {
     id:uid('inc'), title, category, description:desc, severity:pickedSeverity, status:'active',
     confidence:20, confirmations:0, reportedBy, createdAt:now(),
-    lat:miniPin.rp.x, lng:miniPin.rp.y,
+    lat:pinCoords.rp.lat, lng:pinCoords.rp.lng,
     timeline:[{time:now(), text:'Report submitted.', source:'community', by:reportedBy}],
   };
   data.incidents.unshift(inc);
   await persist('incidents');
   toast('Report submitted', 'Your incident is now live.', '📝');
-  pickedSeverity='medium'; miniPin.rp={x:50,y:50};
+  pickedSeverity='medium'; pinCoords.rp=null;
   openIncident(inc.id);
 }
 
@@ -666,15 +792,23 @@ async function postOfficial(){
 
 /* expose */
 Object.assign(window, {setRole,setView,toggleFilter,openIncident,confirmIncident,advanceIncident,openCaseFor,openProvider,
-  submitProvider,requestBooking,acceptBooking,pickSeverity,submitReport,openCase,postOfficial,placeMiniPin,submitOrg});
+  submitProvider,requestBooking,acceptBooking,pickSeverity,submitReport,openCase,postOfficial,useMyLocationFor,submitOrg});
 
-// Wait for Supabase to load, then start app
-setTimeout(() => {
-  if(window.supabase && !supabase) {
+// Wait for Supabase to load, then start app (polls instead of a fixed delay, so it works on slow connections too)
+function waitForSupabaseThenStart(attemptsLeft){
+  if(window.supabase && !supabase){
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    loadAll();
+    return;
   }
-  loadAll();
-}, 500);
+  if(attemptsLeft <= 0){
+    console.warn('Supabase library never loaded — starting with empty/local state.');
+    loadAll();
+    return;
+  }
+  setTimeout(()=>waitForSupabaseThenStart(attemptsLeft-1), 200);
+}
+waitForSupabaseThenStart(50); // up to ~10s
 </script>
 </body>
 </html>
