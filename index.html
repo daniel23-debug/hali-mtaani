@@ -3,30 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hali Mtaani</title>
+<meta name="description" content="Hali Mtaani — know what's happening in your mtaa. Real community incident reports, local services, and organization responses.">
+<meta name="theme-color" content="#14181B">
+<title>Hali Mtaani — Know what's happening in your mtaa</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23C1502E'/%3E%3Ctext x='32' y='44' font-family='Georgia' font-size='36' font-weight='bold' fill='%23EFE9DD' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script>
+/* Supabase loader: primary CDN + fallback CDN, and we VERIFY the global exists
+   (a script can "load" without defining window.supabase if the wrong build resolves). */
 (function(){
-  function loadScript(src, onload, onerror){
+  var PRIMARY  = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+  var FALLBACK = 'https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+  function ready(){ return !!(window.supabase && window.supabase.createClient); }
+  window.__supabaseReady = ready;
+  function load(src, cb){
     var s = document.createElement('script');
-    s.src = src; s.defer = true; s.onload = onload; s.onerror = onerror;
+    s.src = src; s.async = true;
+    s.onload = function(){ cb(null); };
+    s.onerror = function(){ cb(new Error('failed: ' + src)); };
     document.head.appendChild(s);
   }
-  loadScript(
-    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4',
-    function(){ console.log('Supabase loaded (jsdelivr)'); },
-    function(){
-      console.warn('jsdelivr failed to load supabase-js, trying unpkg fallback');
-      loadScript(
-        'https://unpkg.com/@supabase/supabase-js@2.45.4',
-        function(){ console.log('Supabase loaded (unpkg fallback)'); },
-        function(){ console.error('Both CDNs failed to load supabase-js — app will run with empty/local state.'); }
-      );
-    }
-  );
+  function ensureLoaded(src, next){
+    load(src, function(err){
+      if(err){
+        console.warn('Supabase CDN failed (' + src + ')' + (next ? ' — trying fallback…' : ' — running offline.'));
+        if(next) next();
+        return;
+      }
+      var tries = 0;
+      (function check(){
+        if(ready()){ console.log('Supabase library loaded (' + src + ')'); return; }
+        if(++tries < 25){ setTimeout(check, 200); return; } /* ~5s grace for slow parse */
+        console.warn('Script from ' + src + ' did not provide window.supabase' + (next ? ' — trying fallback…' : ' — running offline.'));
+        if(next) next();
+      })();
+    });
+  }
+  ensureLoaded(PRIMARY, function(){ ensureLoaded(FALLBACK, null); });
 })();
 </script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer onerror="(function(){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';s.defer=true;document.head.appendChild(s);})()"></script>
 <style>
 :root{
   --ink:#14181B; --ink-2:#1D2226; --ink-3:#262C30;
@@ -65,12 +84,13 @@ a{color:inherit;} button{font-family:inherit; cursor:pointer;}
 .nav-badge{ margin-left:auto; background:var(--murram); color:var(--paper); font-family:var(--font-mono); font-size:9.5px; padding:1px 6px; border-radius:20px; font-weight:600;}
 .sidebar-footer{ margin-top:auto; }
 .sync-note{ font-family:var(--font-mono); font-size:9.5px; color:var(--paper-dim); text-align:center; line-height:1.6; display:flex; align-items:center; gap:6px; justify-content:center;}
+.dot-live{ width:6px; height:6px; border-radius:50%; background:var(--savanna); box-shadow:0 0 0 3px var(--savanna-soft); flex-shrink:0;}
+.dot-live.saving{ background:var(--ochre); box-shadow:0 0 0 3px var(--ochre-soft); animation:pulse 1s infinite;}
+.dot-live.denied{ background:var(--murram); box-shadow:0 0 0 3px var(--murram-soft);}
+@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.4} }
 .main{ flex:1; min-width:0; display:flex; flex-direction:column; height:100vh; overflow:hidden;}
 .topbar{ display:flex; align-items:center; gap:14px; padding: 16px 26px; border-bottom:1px solid var(--line); flex-shrink:0;}
 .location-pill{ font-family:var(--font-mono); font-size:11px; color:var(--paper-dim); border:1px solid var(--line-strong); padding:5px 11px; border-radius:20px; display:flex; align-items:center; gap:6px;}
-.dot-live{ width:6px; height:6px; border-radius:50%; background:var(--savanna); box-shadow:0 0 0 3px var(--savanna-soft);}
-.dot-live.saving{ background:var(--ochre); box-shadow:0 0 0 3px var(--ochre-soft); animation:pulse 1s infinite;}
-@keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.4} }
 .search-bar{ flex:1; max-width:440px; display:flex; align-items:center; gap:9px; background: var(--ink-2); border:1px solid var(--line-strong); border-radius:10px; padding:9px 14px;}
 .search-bar input{ background:none; border:none; outline:none; color:var(--paper); font-size:13px; width:100%; font-family:var(--font-body);}
 .search-bar input::placeholder{ color:var(--paper-dim); }
@@ -123,16 +143,30 @@ a{color:inherit;} button{font-family:inherit; cursor:pointer;}
 .map-legend{ position:absolute; bottom:14px; left:14px; z-index:1000; background:rgba(20,24,27,.85); backdrop-filter:blur(4px); border:1px solid var(--line-strong); border-radius:10px; padding:10px 12px; font-size:11px; display:flex; gap:12px; flex-wrap:wrap;}
 .legend-item{ display:flex; align-items:center; gap:6px; color:var(--paper-dim);} .legend-dot{ width:8px; height:8px; border-radius:50%;}
 .map-hint{ position:absolute; top:14px; right:14px; z-index:1000; }
+.map-empty-hint{ position:absolute; top:14px; right:14px; z-index:1001; background:rgba(29,34,38,.93); backdrop-filter:blur(6px); border:1px solid var(--line-strong); border-radius:12px; padding:12px 14px; max-width:230px; box-shadow:0 8px 24px rgba(0,0,0,.45); animation:slidein .25s ease;}
+.meh-close{ position:absolute; top:4px; right:6px; background:none; border:none; color:var(--paper-dim); font-size:12px; padding:6px;}
+.meh-close:hover{ color:var(--paper); }
+.meh-title{ font-weight:700; font-size:13px; padding-right:18px;}
+.meh-sub{ font-size:11.5px; color:var(--paper-dim); margin-top:3px; line-height:1.45;}
+.meh-btn{ margin-top:10px; width:100%; justify-content:center; font-size:12px; padding:8px 12px;}
 .locate-btn{ z-index:1000; background:var(--ink-2); border:1px solid var(--line-strong); color:var(--paper); border-radius:9px; padding:8px 12px; font-size:11.5px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer; font-family:var(--font-body);}
 .locate-btn:hover{ border-color:var(--murram); }
 .locate-btn.locating{ opacity:.6; cursor:wait; }
 .geo-status{ font-family:var(--font-mono); font-size:10.5px; color:var(--paper-dim); margin-top:6px; display:flex; align-items:center; gap:6px; }
+.map-fallback{ position:absolute; inset:0; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px;}
+.map-fallback-note{ background:var(--ink-3); border:1px solid var(--line-strong); border-radius:10px; padding:12px 14px; font-size:12.5px; color:var(--paper-dim); line-height:1.5;}
+.mini-fallback{ background:var(--ink-3); border:1px solid var(--line-strong); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px;}
+.mini-fallback .mf-row{ display:flex; gap:10px; }
+.mini-fallback input{ flex:1; min-width:0; background:var(--ink-2); border:1px solid var(--line-strong); border-radius:8px; padding:9px 11px; color:var(--paper); font-family:var(--font-mono); font-size:12px; outline:none;}
+.mini-fallback input:focus{ border-color:var(--murram); }
+.mini-map .leaflet-control-attribution{ font-size:8px; background:rgba(20,24,27,.7) !important; color:var(--paper-dim) !important;}
+.mini-map .leaflet-control-attribution a{ color:var(--paper-dim) !important; }
 .timeline{ position:relative; padding-left:22px; } .timeline::before{ content:''; position:absolute; left:5px; top:4px; bottom:4px; width:1px; background:var(--line-strong);}
 .tl-item{ position:relative; padding-bottom:20px;} .tl-item:last-child{ padding-bottom:0;}
 .tl-dot{ position:absolute; left:-22px; top:2px; width:11px; height:11px; border-radius:50%; border:2px solid var(--ink-2);}
 .tl-time{ font-family:var(--font-mono); font-size:10px; color:var(--paper-dim); margin-bottom:2px;}
 .tl-text{ font-size:13px; line-height:1.5;} .tl-source{ font-family:var(--font-mono); font-size:10px; color:var(--paper-dim); margin-top:2px;}
-#toast-layer{ position:fixed; top:18px; right:18px; z-index:200; display:flex; flex-direction:column; gap:10px; width:340px;}
+#toast-layer{ position:fixed; top:18px; right:18px; z-index:200; display:flex; flex-direction:column; gap:10px; width:340px; max-width:calc(100vw - 36px);}
 .toast{ background: var(--ink-2); border:1px solid var(--murram); border-left:4px solid var(--murram); border-radius:10px; padding:13px 15px; display:flex; gap:11px; box-shadow:0 10px 30px rgba(0,0,0,.4); animation: slidein .25s ease;}
 @keyframes slidein{ from{ transform:translateX(30px); opacity:0;} to{transform:translateX(0); opacity:1;} }
 .toast-icon{ font-size:16px; } .toast-title{ font-weight:700; font-size:12.5px; margin-bottom:2px;} .toast-body{ font-size:11.5px; color:var(--paper-dim); line-height:1.4;}
@@ -151,104 +185,390 @@ a{color:inherit;} button{font-family:inherit; cursor:pointer;}
 .spinner-wrap{ display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; width:100%; gap:14px; color:var(--paper-dim);}
 .spinner{ width:26px; height:26px; border-radius:50%; border:3px solid var(--ink-3); border-top-color:var(--murram); animation:spin .8s linear infinite;}
 @keyframes spin{ to{ transform:rotate(360deg);} }
+.search-chip{ display:inline-flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; color:var(--paper-dim); border:1px solid var(--line-strong); border-radius:20px; padding:5px 8px 5px 12px; margin-bottom:14px;}
+.search-chip button{ background:var(--ink-3); border:1px solid var(--line-strong); color:var(--paper); border-radius:14px; font-size:10.5px; padding:2px 9px;}
 @media (max-width: 880px){
   .sidebar{ display:none; }
   .mobile-tabbar{ display:flex; position:fixed; bottom:0; left:0; right:0; height:56px; background:var(--ink-2); border-top:1px solid var(--line); z-index:140;}
   .mt-item{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:none; border:none; color:var(--paper-dim); font-size:9.5px;}
   .mt-item.active{ color:var(--murram); } .mt-item span.ic{ font-size:16px; }
   .content{ padding:18px 16px 90px; } .topbar{ padding:12px 16px; } .search-bar{ display:none; }
+  .grid-2{ grid-template-columns:1fr; }
+  .map-filters{ max-width:calc(100% - 28px); }
+  .map-legend{ font-size:10px; padding:8px 10px; gap:8px; }
+  .map-empty-hint{ max-width:200px; }
 }
 </style>
 </head>
 <body>
+<noscript><div style="padding:40px;text-align:center;font-family:sans-serif;">Hali Mtaani needs JavaScript enabled to run.</div></noscript>
 <div id="toast-layer"></div>
-<div id="app"><div class="spinner-wrap"><div class="spinner"></div><div>Loading real data…</div></div></div>
+<div id="app"><div class="spinner-wrap"><div class="spinner"></div><div>Loading…</div></div></div>
 
 <script>
 /* =========================================================
-   HALI MTAANI — PROTOTYPE
-   All data is real and persisted via window.storage (shared).
-   No seeded / fabricated content. Empty until people add it.
+   HALI MTAANI
+   Offline-first: everything works on this device even with no
+   connection; changes sync to Supabase automatically when the
+   server is reachable. No seeded / fabricated content.
    ========================================================= */
+'use strict';
 
+/* ---------------- SMALL SAFE HELPERS ---------------- */
 const now = () => Date.now();
-const fmtTime = (ts) => new Date(ts).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'});
-const fmtAgo = (ts) => {
-  const diff = Math.floor((now()-ts)/60000);
+
+function fmtTime(ts){
+  if(ts==null || ts==='') return '--:--';
+  const t = Number(ts);
+  if(!isFinite(t) || t<=0) return '--:--';
+  try{ return new Date(t).toLocaleTimeString('en-KE',{hour:'2-digit',minute:'2-digit'}); }
+  catch(e){ return '--:--'; }
+}
+function fmtAgo(ts){
+  if(ts==null || ts==='') return 'recently';
+  const t = Number(ts);
+  if(!isFinite(t) || t<=0) return 'recently';
+  const diff = Math.floor((now()-t)/60000);
   if(diff < 1) return 'just now';
   if(diff < 60) return diff+'m ago';
   if(diff < 1440) return Math.floor(diff/60)+'h ago';
   return Math.floor(diff/1440)+'d ago';
+}
+function uid(p){
+  let rand = Math.random().toString(36).slice(2,9);
+  try{ if(window.crypto && crypto.randomUUID) return p + '-' + crypto.randomUUID(); }catch(e){}
+  return p + '-' + rand + Date.now().toString(36).slice(-4);
+}
+/* HTML-escape for text content */
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.innerText = (s==null ? '' : String(s));
+  return d.innerHTML;
+}
+/* Escape for double-quoted HTML attributes */
+function escAttr(s){
+  return escapeHtml(s).replace(/"/g,'&quot;');
+}
+/* Escape for a JS single-quoted string inside a double-quoted HTML attribute.
+   HTML-decoding happens before JS parsing, so & must be encoded too. */
+function q(s){
+  return String(s==null?'':s)
+    .replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+    .replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+/* Null-safe trimmed input value */
+function val(id){
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+/* localStorage that never throws (private mode / blocked cookies fall back to memory) */
+const store = {
+  mem:{},
+  get(k){
+    try{ const v = localStorage.getItem(k); return v==null ? (this.mem[k]!=null?this.mem[k]:null) : v; }
+    catch(e){ return this.mem[k]!=null?this.mem[k]:null; }
+  },
+  set(k,v){
+    this.mem[k]=v;
+    try{ localStorage.setItem(k,v); }catch(e){}
+  }
 };
-const uid = (p) => p + '-' + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-4);
-
-const sourceColor = {community:'var(--murram)', official:'var(--sky)', platform:'var(--savanna)'};
-const catIcon = {Flooding:'💧', Transport:'🚌', Utilities:'🔧', Infrastructure:'💡', Safety:'⚠️', Other:'📍'};
-const catColor = {Flooding:'var(--sky)', Transport:'var(--ochre)', Utilities:'var(--murram)', Infrastructure:'var(--paper-dim)', Safety:'var(--murram)', Other:'var(--paper-dim)'};
-
-/* SUPABASE CONFIG */
-const SUPABASE_URL = 'https://ymodhguvnvzrxvohwgtk.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_L-Wo7vr2j0bPyl1PPnZwPg_nkVfWRnD';
-let supabase = null;
-if(window.supabase) {
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-} else {
-  console.warn('Supabase library not loaded');
-}
-
-/* ---------------- STORAGE LAYER (real persistence, shared) ---------------- */
-const KEYS = {incidents:'incidents', providers:'providers', bookings:'bookings', alerts:'alerts', cases:'cases', orgs:'orgs'};
-
-async function loadCollection(key){
-  if(!supabase) return {rows:[], failed:true};
-  try{
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    const { data, error } = await supabase.from(key).select('*').abortSignal(controller.signal);
-    clearTimeout(timeout);
-    if(error) throw error;
-    return {rows: data || [], failed:false};
-  }catch(e){
-    console.warn(`Load ${key} failed`, e);
-    return {rows:[], failed:true};
-  }
-}
-async function saveCollection(key, arr){
-  if(!supabase) return {ok:false, reason:'no-client'};
-  try{
-    if(arr.length > 0){
-      const { error } = await supabase.from(key).upsert(arr, {onConflict:'id'});
-      if(error) throw error; // supabase-js doesn't throw on its own — RLS/policy failures land here
-    }
-    return {ok:true};
-  }catch(e){
-    console.warn(`Save ${key} failed`, e);
-    return {ok:false, error:e};
-  }
-}
-
-/* ---------------- DEVICE ID (anonymous, persistent, used to prevent duplicate confirmations) ---------------- */
 function getDeviceId(){
-  let id = localStorage.getItem('hm_device_id');
+  let id = store.get('hm_device_id');
   if(!id){
-    id = (crypto.randomUUID ? crypto.randomUUID() : 'dev-'+Date.now()+'-'+Math.random().toString(16).slice(2));
-    localStorage.setItem('hm_device_id', id);
+    try{ id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : null; }catch(e){ id = null; }
+    if(!id) id = 'dev-'+Date.now()+'-'+Math.random().toString(16).slice(2);
+    store.set('hm_device_id', id);
   }
   return id;
 }
 
-/* ---------------- DOUBLE-SUBMIT GUARD (prevents duplicate records from double-clicks / slow network) ---------------- */
+/* ---------------- DOUBLE-SUBMIT GUARD ---------------- */
 const inFlightActions = new Set();
 async function guardOnce(key, fn){
-  if(inFlightActions.has(key)) return; // a submission with this key is already running — ignore the extra click
+  if(inFlightActions.has(key)) return; /* already running — ignore the extra click */
   inFlightActions.add(key);
   try{ return await fn(); }
   finally{ inFlightActions.delete(key); }
 }
 
-// Views with form fields the user might be mid-typing in. Background syncs must never
-// auto-redraw these — the underlying `data` still gets refreshed, it just won't touch the
-// screen until the user navigates away on their own.
+const sourceColor = {community:'var(--murram)', official:'var(--sky)', platform:'var(--savanna)'};
+const catIcon = {Flooding:'💧', Transport:'🚌', Utilities:'🔧', Infrastructure:'💡', Safety:'⚠️', Other:'📍'};
+const catColor = {Flooding:'var(--sky)', Transport:'var(--ochre)', Utilities:'var(--murram)', Infrastructure:'var(--paper-dim)', Safety:'var(--murram)', Other:'var(--paper-dim)'};
+
+/* ---------------- SUPABASE CONFIG ---------------- */
+const SUPABASE_URL = 'https://ymodhguvnvzrxvohwgtk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_L-Wo7vr2j0bPyl1PPnZwPg_nkVfWRnD';
+let sbClient = null;        /* local name on purpose: window.supabase stays the library */
+let realtimeStarted = false;
+
+function ensureClient(){
+  if(sbClient) return sbClient;
+  try{
+    if(window.supabase && window.supabase.createClient){
+      sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+  }catch(e){
+    console.warn('Could not create Supabase client — staying offline.', e);
+    sbClient = null;
+  }
+  return sbClient;
+}
+
+/* ---------------- STORAGE LAYER (offline-first) ---------------- */
+const KEYS = {incidents:'incidents', providers:'providers', bookings:'bookings', alerts:'alerts', cases:'cases', orgs:'orgs'};
+const COLLECTIONS = Object.keys(KEYS);
+
+let data = { incidents:[], providers:[], bookings:[], alerts:[], cases:[], orgs:[] };
+let outbox = [];            /* [{key,row,ts}] rows waiting to sync */
+let pendingIds = new Set(); /* ids currently in the outbox */
+const localOnly = {};       /* key -> true when the server table is unusable (missing/blocked) */
+const noticed = new Set();  /* one-time notices per session */
+let backendLive = false;    /* at least one collection recently synced OK */
+
+function normalizeAll(){
+  COLLECTIONS.forEach(k=>{
+    if(!Array.isArray(data[k])){ data[k]=[]; return; }
+    data[k] = data[k].filter(r=>r && typeof r==='object'); /* drop null/corrupt rows */
+  });
+  data.incidents.forEach(r=>{
+    if(typeof r.confirmations!=='number') r.confirmations = 0;
+    if(typeof r.confidence!=='number') r.confidence = 20;
+    if(!r.severity) r.severity='medium';
+    if(!r.status) r.status='active';
+    if(!r.category) r.category='Other';
+    if(!r.title) r.title='Untitled report';
+    if(!r.reportedBy) r.reportedBy='Anonymous resident';
+    if(!isFinite(Number(r.createdAt))) r.createdAt = now();
+    if(!Array.isArray(r.timeline)) r.timeline=[];
+    if(!Array.isArray(r.confirmedBy)) r.confirmedBy=[];
+  });
+  data.providers.forEach(r=>{
+    if(typeof r.verified!=='boolean') r.verified=false;
+    if(!r.name) r.name='Unnamed provider';
+    if(!r.category) r.category='General';
+    if(!isFinite(Number(r.createdAt))) r.createdAt = now();
+  });
+  data.bookings.forEach(r=>{
+    if(!r.status) r.status='pending';
+    if(!isFinite(Number(r.time))) r.time = now();
+  });
+  data.alerts.forEach(r=>{
+    if(!isFinite(Number(r.time))) r.time = now();
+    if(!r.level) r.level='info';
+  });
+  data.cases.forEach(r=>{
+    if(!r.status) r.status='in-progress';
+    if(!isFinite(Number(r.updatedAt))) r.updatedAt = now();
+  });
+  data.orgs.forEach(r=>{
+    if(typeof r.verified!=='boolean') r.verified=false;
+    if(!r.name) r.name='Unnamed organization';
+    if(!isFinite(Number(r.createdAt))) r.createdAt = now();
+  });
+}
+
+function loadCacheIntoData(){
+  try{
+    const raw = store.get('hm_cache_v1');
+    if(raw){
+      const cached = JSON.parse(raw);
+      COLLECTIONS.forEach(k=>{ if(Array.isArray(cached[k])) data[k]=cached[k]; });
+    }
+  }catch(e){ console.warn('Cache read failed, starting empty.', e); }
+  try{
+    const rawBox = store.get('hm_outbox_v1');
+    if(rawBox){
+      const parsed = JSON.parse(rawBox);
+      if(Array.isArray(parsed)){
+        outbox = parsed.filter(e=>e && e.key && e.row && e.row.id).slice(0,200);
+        pendingIds = new Set(outbox.map(e=>e.row.id));
+      }
+    }
+  }catch(e){ console.warn('Outbox read failed.', e); }
+  normalizeAll();
+}
+function writeCache(){
+  try{ store.set('hm_cache_v1', JSON.stringify(data)); }catch(e){}
+}
+function writeOutbox(){
+  try{ store.set('hm_outbox_v1', JSON.stringify(outbox.slice(0,200))); }catch(e){}
+}
+function queueRow(key, row){
+  if(!row || !row.id) return;
+  outbox = outbox.filter(e=>!(e.key===key && e.row && e.row.id===row.id));
+  outbox.push({key, row, ts:now()});
+  if(outbox.length>200) outbox = outbox.slice(-200);
+  pendingIds.add(row.id);
+  writeOutbox();
+}
+function dequeueRow(key, id){
+  outbox = outbox.filter(e=>!(e.key===key && e.row && e.row.id===id));
+  if(!outbox.some(e=>e.row && e.row.id===id)) pendingIds.delete(id);
+  writeOutbox();
+}
+function noticeOnce(key, title, body, icon){
+  if(noticed.has(key)) return;
+  noticed.add(key);
+  toast(title, body, icon||'ℹ️');
+}
+
+/* Per-device "read" state for alerts (the server copy stays unread for everyone else) */
+function getReadSet(){
+  try{
+    const raw = store.get('hm_read_v1');
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(arr)?arr:[]);
+  }catch(e){ return new Set(); }
+}
+function isRead(id){ return getReadSet().has(id); }
+function markAllAlertsReadLocally(){
+  try{
+    const s = getReadSet();
+    data.alerts.forEach(a=>{ if(a && a.id) s.add(a.id); });
+    store.set('hm_read_v1', JSON.stringify([...s].slice(-500)));
+  }catch(e){}
+}
+function unreadAlertCount(){ const s=getReadSet(); return data.alerts.filter(a=>a && a.id && !s.has(a.id)).length; }
+
+/* Classify Supabase/PostgREST errors so we react correctly */
+function errCode(e){ return (e && (e.code || e.status)) ? String(e.code || e.status) : ''; }
+function errMsg(e){ return String((e && e.message) || e || ''); }
+function isSchemaError(e){ /* missing table / column — retrying won't help until the DB is fixed */
+  const c = errCode(e), m = errMsg(e).toLowerCase();
+  return c==='PGRST205' || c==='PGRST204' || c==='42P01' || c==='42703' || c==='404' ||
+    m.indexOf('schema cache')>-1 || m.indexOf('does not exist')>-1 || m.indexOf('not found')>-1;
+}
+function isPermissionError(e){ /* RLS / auth — retrying won't help until policies are fixed */
+  const c = errCode(e), m = errMsg(e).toLowerCase();
+  return c==='42501' || c==='401' || c==='403' ||
+    m.indexOf('row-level security')>-1 || m.indexOf('permission denied')>-1 || m.indexOf('unauthorized')>-1;
+}
+
+async function loadCollection(key){
+  const client = ensureClient();
+  if(!client || localOnly[key]) return {rows:[], failed:true, skipped:true};
+  try{
+    const controller = new AbortController();
+    const timer = setTimeout(()=>controller.abort(), 6000);
+    let req;
+    try{
+      req = client.from(key).select('*');
+      if(req && typeof req.abortSignal==='function') req = req.abortSignal(controller.signal);
+      const { data:rows, error } = await req;
+      clearTimeout(timer);
+      if(error) throw error;
+      return {rows: Array.isArray(rows)?rows:[], failed:false};
+    }catch(inner){ clearTimeout(timer); throw inner; }
+  }catch(e){
+    if(isSchemaError(e)){
+      localOnly[key]=true;
+      console.warn(`Table "${key}" is missing/unusable on the server — using on-device data. Run supabase-schema.sql to fix.`, e);
+      noticeOnce('schema:'+key, 'Server table missing', `“${key}” isn't set up on the server yet — your entries are kept safely on this device.`, '⚠️');
+    } else {
+      console.warn(`Load ${key} failed (will retry)`, e);
+    }
+    return {rows:[], failed:true};
+  }
+}
+
+/* Merge server rows with local-only rows (created while offline) so a sync never wipes them */
+function mergeServerRows(key, serverRows){
+  const seen = new Set();
+  const merged = [];
+  serverRows.forEach(r=>{
+    if(r && r.id!=null){ seen.add(r.id); merged.push(r); }
+  });
+  (Array.isArray(data[key])?data[key]:[]).forEach(r=>{
+    if(r && r.id!=null && !seen.has(r.id) && pendingIds.has(r.id)){ merged.push(r); }
+  });
+  return merged;
+}
+
+async function fetchAllCollections(){
+  const work = Promise.all(COLLECTIONS.map(k=>loadCollection(KEYS[k])));
+  const timeout = new Promise(res=>setTimeout(()=>res(null), 12000));
+  const results = await Promise.race([work, timeout]);
+  if(!results) return null;
+  let anyOk = false;
+  results.forEach((r,i)=>{
+    const key = COLLECTIONS[i];
+    if(!r.failed){
+      anyOk = true;
+      data[key] = mergeServerRows(key, r.rows);
+    }
+  });
+  normalizeAll();
+  writeCache();
+  if(anyOk) backendLive = true;
+  return results;
+}
+
+/* Save ONE row: always persist on-device first, then try the server. Never throws. */
+async function saveRow(key, row){
+  if(!row || !row.id) return {ok:false, synced:false};
+  writeCache();
+  queueRow(key, row); /* queued optimistically; removed again if the sync below succeeds */
+  const client = ensureClient();
+  if(!client || localOnly[key]){ updateSyncUI(); return {ok:true, synced:false}; }
+  state.saving = true; updateSyncUI();
+  try{
+    const { error } = await client.from(key).upsert(row, {onConflict:'id'});
+    if(error) throw error;
+    dequeueRow(key, row.id);
+    backendLive = true;
+    return {ok:true, synced:true};
+  }catch(e){
+    if(isSchemaError(e)){
+      localOnly[key]=true;
+      dequeueRow(key, row.id);
+      console.warn(`Save to "${key}" failed: table/column missing on server — kept on device.`, e);
+      noticeOnce('schema:'+key, 'Server table missing', `“${key}” isn't set up on the server yet — your entries are kept safely on this device.`, '⚠️');
+    } else if(isPermissionError(e)){
+      dequeueRow(key, row.id);
+      console.warn(`Save to "${key}" refused by server permissions — kept on device.`, e);
+      noticeOnce('perm:'+key, 'Server permissions', `The server refused to save “${key}” (check access policies) — kept on this device.`, '⚠️');
+    } else {
+      console.warn(`Save ${key} failed (staying queued for retry)`, e);
+    }
+    return {ok:true, synced:false};
+  }finally{
+    state.saving = false; updateSyncUI();
+  }
+}
+
+/* Push queued rows when the server becomes reachable again */
+async function flushOutbox(){
+  if(!outbox.length) return;
+  const client = ensureClient();
+  if(!client) return;
+  const pending = outbox.slice(0,200);
+  for(const entry of pending){
+    if(!entry || !entry.key || !entry.row || !entry.row.id){ continue; }
+    if(localOnly[entry.key]) continue;
+    try{
+      const { error } = await client.from(entry.key).upsert(entry.row, {onConflict:'id'});
+      if(error) throw error;
+      dequeueRow(entry.key, entry.row.id);
+      backendLive = true;
+    }catch(e){
+      if(isSchemaError(e) || isPermissionError(e)){
+        dequeueRow(entry.key, entry.row.id); /* retrying is pointless — keep the on-device copy */
+        if(isSchemaError(e)) localOnly[entry.key]=true;
+      } else {
+        break; /* still offline — stop and try again next cycle */
+      }
+    }
+  }
+  updateSyncUI();
+}
+
+function isEmptyData(){ return COLLECTIONS.every(k=>!data[k] || !data[k].length); }
+
+/* Views with form fields the user might be mid-typing in. Background syncs must never
+   auto-redraw these — `data` still gets refreshed; the screen updates on next navigation. */
 const FORM_VIEWS = new Set(['report','provider-register','org-register','org-comms','provider']);
 
 const state = {
@@ -257,60 +577,83 @@ const state = {
   selectedIncident:null, selectedProvider:null, selectedCase:null,
   mapFilters:{incident:true, service:true},
   saving:false,
-  userCoords:null,        // {lat,lng} from real device GPS, once granted
+  searchQuery:'',
+  userCoords:null,        /* {lat,lng} from real device GPS, once granted */
+  userAccuracy:null,
   locationLabel:'Locating…',
-  locationStatus:'pending', // pending | ok | denied | unavailable
+  locationStatus:'pending', /* pending | ok | denied | unavailable */
 };
 
 /* ---------------- REAL GEOLOCATION ---------------- */
 const NAIROBI_FALLBACK = {lat:-1.2921, lng:36.8219};
 
-let geoWatchId = null;
+let geoWatchId = null, geoBusy = false;
+const geoQueue = [];
 function requestGeolocation(onDone){
+  if(typeof onDone==='function' && geoBusy){ geoQueue.push(onDone); return; } /* one GPS session at a time */
+  if(typeof onDone==='function') geoQueue.push(onDone);
+  if(geoBusy) return;
+  geoBusy = true;
+
+  const finish = (coords)=>{
+    geoBusy = false;
+    const cbs = geoQueue.splice(0, geoQueue.length);
+    cbs.forEach(cb=>{ try{cb(coords);}catch(e){ console.warn('geo callback failed', e); } });
+  };
+
   if(!('geolocation' in navigator)){
     state.locationStatus='unavailable'; state.locationLabel='Location not supported';
-    updateLocationPill(); if(onDone) onDone(null);
+    updateLocationPill(); finish(null);
     return;
   }
   if(window.isSecureContext===false){
     state.locationStatus='unavailable'; state.locationLabel='Needs HTTPS to locate you';
-    updateLocationPill(); if(onDone) onDone(null);
+    updateLocationPill(); finish(null);
     return;
   }
-  if(geoWatchId!==null){ navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+  if(geoWatchId!==null){ try{navigator.geolocation.clearWatch(geoWatchId);}catch(e){} geoWatchId=null; }
   state.locationStatus='pending'; state.locationLabel='Locating…'; updateLocationPill();
 
   let bestCoords=null, bestAccuracy=Infinity, settled=false;
-  const finish = async (coords, accuracy)=>{
+  const settle = async (coords, accuracy)=>{
     if(settled) return; settled=true;
-    if(geoWatchId!==null){ navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+    if(geoWatchId!==null){ try{navigator.geolocation.clearWatch(geoWatchId);}catch(e){} geoWatchId=null; }
     if(coords){
       state.userCoords=coords; state.userAccuracy=accuracy; state.locationStatus='ok';
       await reverseGeocode(coords);
     }
-    if(onDone) onDone(coords);
+    finish(coords||null);
   };
 
-  geoWatchId = navigator.geolocation.watchPosition((pos)=>{
-    const coords = {lat:pos.coords.latitude, lng:pos.coords.longitude};
-    const accuracy = pos.coords.accuracy; // meters — lower is better
-    if(accuracy < bestAccuracy){ bestAccuracy = accuracy; bestCoords = coords; }
-    // A GPS-grade fix (<=50m) is good enough to stop waiting immediately.
-    if(accuracy <= 50) finish(coords, accuracy);
-  }, (err)=>{
-    if(err.code===1){
-      state.locationStatus='denied'; state.locationLabel='Location permission denied';
-      updateLocationPill(); finish(null);
-    }
-    // Other errors (timeout/unavailable) during watch: keep waiting for the deadline below,
-    // since watchPosition can recover after transient failures.
-  }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+  try{
+    geoWatchId = navigator.geolocation.watchPosition((pos)=>{
+      if(!pos || !pos.coords) return;
+      const coords = {lat:pos.coords.latitude, lng:pos.coords.longitude};
+      const accuracy = (typeof pos.coords.accuracy==='number') ? pos.coords.accuracy : 9999;
+      if(accuracy < bestAccuracy){ bestAccuracy = accuracy; bestCoords = coords; }
+      if(accuracy <= 50) settle(coords, accuracy); /* GPS-grade fix — stop immediately */
+    }, (err)=>{
+      if(err && err.code===1){
+        if(settled) return; settled=true;
+        if(geoWatchId!==null){ try{navigator.geolocation.clearWatch(geoWatchId);}catch(e){} geoWatchId=null; }
+        state.locationStatus='denied'; state.locationLabel='Location permission denied';
+        updateLocationPill(); finish(null);
+      }
+      /* Other errors during watch: keep waiting for the deadline, watch can recover */
+    }, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+  }catch(e){
+    state.locationStatus='unavailable'; state.locationLabel='Location unavailable';
+    updateLocationPill(); finish(null);
+    return;
+  }
 
-  // Deadline: after 12s, accept the best fix seen so far (even if coarse) rather than failing outright.
+  /* Deadline: after 12s accept the best fix seen (even coarse) rather than failing outright */
   setTimeout(()=>{
     if(settled) return;
-    if(bestCoords) finish(bestCoords, bestAccuracy);
+    if(bestCoords) settle(bestCoords, bestAccuracy);
     else {
+      settled=true;
+      if(geoWatchId!==null){ try{navigator.geolocation.clearWatch(geoWatchId);}catch(e){} geoWatchId=null; }
       state.locationStatus='unavailable';
       state.locationLabel='Location unavailable — check device GPS/location settings';
       updateLocationPill(); finish(null);
@@ -320,137 +663,161 @@ function requestGeolocation(onDone){
 async function reverseGeocode(coords){
   try{
     const controller = new AbortController();
-    const timeout = setTimeout(()=>controller.abort(), 6000);
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=16&addressdetails=1`, {signal:controller.signal, headers:{'Accept':'application/json'}});
-    clearTimeout(timeout);
+    const timer = setTimeout(()=>controller.abort(), 6000);
+    let res;
+    try{
+      res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.lat}&lon=${coords.lng}&zoom=16&addressdetails=1`, {signal:controller.signal, headers:{'Accept':'application/json'}});
+    }finally{ clearTimeout(timer); }
+    if(!res.ok) throw new Error('geocoder HTTP '+res.status);
     const j = await res.json();
-    const a = j.address || {};
+    const a = (j && j.address) || {};
     const area = a.suburb || a.neighbourhood || a.road || a.town || a.city_district || a.village || a.city || 'Nearby area';
     const city = a.city || a.town || a.county || '';
     state.locationLabel = city && city!==area ? `${area}, ${city}` : area;
   }catch(e){
-    state.locationLabel = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+    state.locationLabel = `${Number(coords.lat).toFixed(5)}, ${Number(coords.lng).toFixed(5)}`;
   }
   updateLocationPill();
 }
 function updateLocationPill(){
   const el = document.getElementById('location-pill-text');
   if(el) el.textContent = state.locationLabel;
-}
-
-let data = { incidents:[], providers:[], bookings:[], alerts:[], cases:[], orgs:[] };
-
-async function loadAll(){
-  try {
-    const loadPromise = Promise.all([
-      loadCollection(KEYS.incidents), loadCollection(KEYS.providers), loadCollection(KEYS.bookings),
-      loadCollection(KEYS.alerts), loadCollection(KEYS.cases), loadCollection(KEYS.orgs),
-    ]);
-
-    const timeoutPromise = new Promise((resolve) =>
-      setTimeout(() => resolve(null), 8000)
-    );
-
-    const results = await Promise.race([loadPromise, timeoutPromise]);
-    if(results){
-      const [incidents, providers, bookings, alerts, cases, orgs] = results;
-      data = {incidents:incidents.rows, providers:providers.rows, bookings:bookings.rows, alerts:alerts.rows, cases:cases.rows, orgs:orgs.rows};
-      if(results.some(r=>r.failed)){
-        toast('Sync issue', "Couldn't load some live data — you may be seeing an outdated view. Try refreshing.", '⚠️');
-      }
-    } else {
-      toast('Connection timed out', "Couldn't reach the live database in time — showing an empty view. Try refreshing.", '⚠️');
-    }
-  } catch (e) {
-    console.warn('Load failed, starting with empty data', e);
-    toast('Connection issue', "Couldn't load live data — try refreshing.", '⚠️');
+  const dot = document.getElementById('location-dot');
+  if(dot){
+    dot.className = 'dot-live' +
+      (state.locationStatus==='pending' ? ' saving' :
+       (state.locationStatus==='denied' || state.locationStatus==='unavailable') ? ' denied' : '');
   }
-  state.loading = false;
-  render();
-  requestGeolocation();
-  subscribeRealtime();
-  startPollingFallback();
 }
 
-/* ---------------- POLLING FALLBACK (safety net if the WebSocket/Realtime connection is blocked or drops) ---------------- */
+/* ---------------- SYNC STATUS UI ---------------- */
+function updateSyncUI(){
+  const dot = document.getElementById('sync-dot');
+  const txt = document.getElementById('sync-note-text');
+  if(!dot && !txt) return;
+  let cls = 'dot-live', label = 'Live sync on · shared with everyone';
+  if(state.saving){ cls += ' saving'; label = 'Saving…'; }
+  else if(!backendLive){ cls += ' denied'; label = (outbox.length ? `Offline · ${outbox.length} change(s) saved on this device — tap to retry` : 'Offline · changes saved on this device — tap to retry'); }
+  if(dot) dot.className = cls;
+  if(txt) txt.textContent = label;
+}
+async function syncNow(){
+  toast('Syncing…', 'Trying to reach the server now.', '🔄');
+  await refreshFromServer(false);
+  renderContent();
+}
+
+/* ---------------- INITIAL LOAD + BACKGROUND SYNC ---------------- */
+let pollCount = 0;
+
+async function refreshFromServer(initial){
+  try{ await flushOutbox(); }catch(e){ console.warn('Outbox flush failed', e); }
+  let results = null;
+  try{ results = await fetchAllCollections(); }catch(e){ console.warn('Refresh failed', e); }
+  if(!results){
+    backendLive = false;
+    if(initial && isEmptyData()){
+      toast('You’re offline', 'No connection and nothing saved yet — anything you add will be kept on this device.', '📡');
+    }
+  } else if(results.some(r=>r.failed) && initial && isEmptyData()){
+    backendLive = backendLive || results.some(r=>!r.failed);
+    if(!backendLive) toast('You’re offline', 'Couldn’t reach the server — anything you add is kept on this device.', '📡');
+  }
+  updateSyncUI();
+  if(!FORM_VIEWS.has(state.view)) renderContent();
+}
+
 function startPollingFallback(){
   setInterval(async ()=>{
-    if(!supabase) return;
-    try{
-      const results = await Promise.all([
-        loadCollection(KEYS.incidents), loadCollection(KEYS.providers), loadCollection(KEYS.bookings),
-        loadCollection(KEYS.alerts), loadCollection(KEYS.cases), loadCollection(KEYS.orgs),
-      ]);
-      if(results.some(r=>r.failed)) return; // don't overwrite good local data with a failed fetch
-      const [incidents, providers, bookings, alerts, cases, orgs] = results;
-      data = {incidents:incidents.rows, providers:providers.rows, bookings:bookings.rows, alerts:alerts.rows, cases:cases.rows, orgs:orgs.rows};
-      // Data is refreshed above either way — but never redraw the screen out from under
-      // someone filling out a form. It'll reflect the fresh data next time they navigate.
-      if(!FORM_VIEWS.has(state.view)) renderContent();
-    }catch(e){ console.warn('Background sync poll failed', e); }
-  }, 15000); // every 15s — catches up even if realtime push never arrives
+    if(document.hidden) return; /* don't churn in background tabs */
+    if(!ensureClient() && !outbox.length && backendLive===false){
+      /* nothing to do without a client, but keep the first poll cheap */
+    }
+    pollCount++;
+    if(pollCount % 4 === 0){ /* re-probe tables marked unusable, in case the DB was fixed */
+      Object.keys(localOnly).forEach(k=>{ delete localOnly[k]; });
+    }
+    if(realtimeStarted===false) subscribeRealtimeSafe(); /* self-heal if the library arrived late */
+    try{ await flushOutbox(); }catch(e){}
+    let results = null;
+    try{ results = await fetchAllCollections(); }
+    catch(e){ console.warn('Background sync poll failed', e); }
+    if(results && results.some(r=>!r.failed)) backendLive = true;
+    updateSyncUI();
+    /* Data is refreshed above either way — but never redraw the screen out from under
+       someone filling out a form. It'll reflect the fresh data next time they navigate. */
+    if(!FORM_VIEWS.has(state.view)) renderContent();
+  }, 15000); /* every 15s — catches up even if realtime push never arrives */
 }
 
-/* ---------------- REALTIME SYNC (pushes changes from any device to every other open device) ---------------- */
-function subscribeRealtime(){
-  if(!supabase) return;
-  Object.values(KEYS).forEach(key=>{
-    supabase.channel(`public:${key}`)
-      .on('postgres_changes', {event:'*', schema:'public', table:key}, (payload)=>{
-        const arr = data[key];
-        if(!arr) return;
-        if(payload.eventType==='DELETE'){
-          const idx = arr.findIndex(r=>r.id===payload.old.id);
-          if(idx>-1) arr.splice(idx,1);
-        } else {
-          const idx = arr.findIndex(r=>r.id===payload.new.id);
-          if(idx>-1) arr[idx] = payload.new; else arr.unshift(payload.new);
-        }
-        if(!FORM_VIEWS.has(state.view)) renderContent();
-      })
-      .subscribe((status)=>{
-        if(status==='SUBSCRIBED') console.log(`Realtime connected: ${key}`);
-        else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
-          console.warn(`Realtime failed for ${key} (${status}) — relying on 15s polling fallback instead.`);
-        }
-      });
-  });
-}
-
-async function persist(key){
-  state.saving = true; updateSyncDot();
-  const result = await saveCollection(KEYS[key], data[key]);
-  state.saving = false; updateSyncDot();
-  if(!result.ok){
-    toast('Not saved', "This didn't save to the server (permissions or connection issue) — it will disappear on refresh unless you fix that and try again.", '⚠️');
+/* Realtime sync (pushes changes from any device to every other open device) */
+function subscribeRealtimeSafe(){
+  const client = ensureClient();
+  if(!client || realtimeStarted) return;
+  try{
+    COLLECTIONS.forEach(key=>{
+      client.channel(`public:${key}`)
+        .on('postgres_changes', {event:'*', schema:'public', table:key}, (payload)=>{
+          try{
+            const arr = data[key];
+            if(!arr || !payload) return;
+            if(payload.eventType==='DELETE'){
+              if(!payload.old || payload.old.id==null) return;
+              const idx = arr.findIndex(r=>r && r.id===payload.old.id);
+              if(idx>-1) arr.splice(idx,1);
+            } else {
+              if(!payload.new || payload.new.id==null) return;
+              const idx = arr.findIndex(r=>r && r.id===payload.new.id);
+              if(idx>-1) arr[idx] = payload.new; else arr.unshift(payload.new);
+              dequeueRow(key, payload.new.id);
+            }
+            normalizeAll(); writeCache();
+            if(!FORM_VIEWS.has(state.view)) renderContent();
+          }catch(e){ console.warn('Realtime update failed to apply', e); }
+        })
+        .subscribe((status)=>{
+          if(status==='SUBSCRIBED'){ backendLive = true; updateSyncUI(); }
+          else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT'){
+            console.warn(`Realtime failed for ${key} (${status}) — relying on 15s polling fallback instead.`);
+          }
+        });
+    });
+    realtimeStarted = true;
+  }catch(e){
+    console.warn('Realtime subscribe failed — polling fallback will keep data fresh.', e);
   }
-  return result.ok;
-}
-function updateSyncDot(){
-  const dot = document.getElementById('sync-dot');
-  if(dot) dot.className = 'dot-live' + (state.saving ? ' saving' : '');
 }
 
 /* ---------------- TOASTS ---------------- */
 function toast(title, body, icon){
-  icon = icon || '🔔';
-  const layer = document.getElementById('toast-layer');
-  const el = document.createElement('div');
-  el.className='toast';
-  el.innerHTML = `<div class="toast-icon">${icon}</div><div><div class="toast-title">${title}</div><div class="toast-body">${body}</div></div>`;
-  layer.appendChild(el);
-  setTimeout(()=>{ el.style.transition='opacity .4s ease'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, 4600);
+  try{
+    icon = icon || '🔔';
+    const layer = document.getElementById('toast-layer');
+    if(!layer) return;
+    const el = document.createElement('div');
+    el.className='toast';
+    const ic = document.createElement('div'); ic.className='toast-icon'; ic.textContent = icon;
+    const wrap = document.createElement('div');
+    const t = document.createElement('div'); t.className='toast-title'; t.textContent = title||'';
+    const b = document.createElement('div'); b.className='toast-body'; b.textContent = body||'';
+    wrap.appendChild(t); wrap.appendChild(b);
+    el.appendChild(ic); el.appendChild(wrap);
+    layer.appendChild(el);
+    while(layer.children.length > 4) layer.removeChild(layer.firstChild);
+    setTimeout(()=>{ el.style.transition='opacity .4s ease'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, 4600);
+  }catch(e){}
 }
 
 /* ---------------- RENDER SHELL ---------------- */
 function render(){
   const app = document.getElementById('app');
-  if(state.loading){ app.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div><div>Loading real data…</div></div>`; return; }
+  if(!app) return;
+  if(state.loading){ app.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div><div>Loading…</div></div>`; return; }
   app.innerHTML = `
     <div class="sidebar">
       <div class="brand">
         <div class="brand-mark">H</div>
-        <div><div class="brand-text">Hali Mtaani</div><div class="brand-sub">Live prototype</div></div>
+        <div><div class="brand-text">Hali Mtaani</div><div class="brand-sub">Live · community-powered</div></div>
       </div>
       <div class="role-switch">
         <button class="role-btn ${state.role==='resident'?'active':''}" onclick="setRole('resident')">Resident</button>
@@ -458,15 +825,15 @@ function render(){
       </div>
       ${state.role==='resident' ? residentNav() : orgNav()}
       <div class="sidebar-footer">
-        <div class="sync-note"><span class="dot-live" id="sync-dot"></span> All data is real, saved live, shared with anyone using this app</div>
+        <div class="sync-note" id="sync-note" onclick="syncNow()" title="Tap to sync now" style="cursor:pointer;"><span class="dot-live" id="sync-dot"></span><span id="sync-note-text">Connecting…</span></div>
       </div>
     </div>
     <div class="main">
       <div class="topbar">
-        <div class="location-pill" style="cursor:pointer;" title="Tap to refresh your location" onclick="requestGeolocation(()=>renderContent())"><span class="dot-live ${state.locationStatus==='pending'?'saving':''}" id="sync-dot-2"></span> <span id="location-pill-text">${escapeHtml(state.locationLabel)}</span></div>
-        <div class="search-bar"><span>🔎</span><input placeholder="Search incidents or services..." onkeydown="if(event.key==='Enter'){setView('services'); this.blur();}"></div>
+        <div class="location-pill" style="cursor:pointer;" title="Tap to refresh your location" onclick="requestGeolocation(function(){renderContent();})"><span class="dot-live ${state.locationStatus==='pending'?'saving':''}" id="location-dot"></span> <span id="location-pill-text">${escapeHtml(state.locationLabel)}</span></div>
+        <div class="search-bar"><span>🔎</span><input id="global-search" value="${escAttr(state.searchQuery)}" placeholder="Search incidents or services... (Enter)" onkeydown="if(event.key==='Enter'){runSearch(this.value);}"></div>
         <div class="topbar-right">
-          <button class="icon-btn" onclick="setView('alerts')">🔔${data.alerts.some(a=>!a.read)?'<span class="ping"></span>':''}</button>
+          <button class="icon-btn" onclick="setView('alerts')">🔔${unreadAlertCount()?'<span class="ping"></span>':''}</button>
           <div class="avatar">${state.role==='resident'?'R':'O'}</div>
         </div>
       </div>
@@ -474,19 +841,21 @@ function render(){
     </div>
     <div class="mobile-tabbar">${mobileTabs()}</div>
   `;
+  updateSyncUI();
+  updateLocationPill();
   renderContent();
 }
 function residentNav(){
-  const unread = data.alerts.filter(a=>!a.read).length;
+  const unread = unreadAlertCount();
   return `<div class="nav">
     <div class="nav-label">Discover</div>
     ${navItem('feed','🏠','Home')} ${navItem('map','🗺️','Map')} ${navItem('services','🛠️','Services')}
     <div class="nav-label">You</div>
-    ${navItem('alerts','🔔','Alerts', unread)} ${navItem('bookings','📋','My Requests', data.bookings.length)} ${navItem('report','📝','Report Incident')}
+    ${navItem('alerts','🔔','Alerts', unread)} ${navItem('bookings','📋','My Requests', myBookings().length)} ${navItem('report','📝','Report Incident')}
   </div>`;
 }
 function orgNav(){
-  const openCases = data.cases.filter(c=>c.status!=='resolved').length;
+  const openCases = data.cases.filter(c=>c && c.status!=='resolved').length;
   return `<div class="nav">
     <div class="nav-label">Organization</div>
     ${navItem('org-dash','📊','Dashboard')} ${navItem('org-cases','🗂️','Cases', openCases)}
@@ -503,157 +872,235 @@ function mobileTabs(){
   return items.map(([v,ic,label])=>`<button class="mt-item ${state.view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${ic}</span>${label}</button>`).join('');
 }
 function setRole(r){ state.role=r; state.view = r==='resident'?'feed':'org-dash'; render(); }
-function setView(v){ state.view=v; render(); document.getElementById('content')?.scrollTo(0,0); }
+function setView(v){ state.view=v; render(); const c=document.getElementById('content'); if(c) c.scrollTo(0,0); }
+
+function runSearch(query){
+  state.searchQuery = String(query||'').trim();
+  if(state.view!=='feed' && state.view!=='services') state.view='feed';
+  render();
+}
+function clearSearch(){ state.searchQuery=''; renderContent(); }
+function matchesQuery(text){
+  const needle = state.searchQuery.trim().toLowerCase();
+  if(!needle) return true;
+  return String(text||'').toLowerCase().indexOf(needle)>-1;
+}
+function searchChipHTML(){
+  if(!state.searchQuery) return '';
+  return `<div class="search-chip">Results for “${escapeHtml(state.searchQuery)}” <button onclick="clearSearch()">Clear ✕</button></div>`;
+}
 
 function renderContent(){
   const c = document.getElementById('content');
+  if(!c) return;
   const views = { feed:viewFeed, map:viewMap, services:viewServices, alerts:viewAlerts, bookings:viewBookings,
     report:viewReport, incident:viewIncident, provider:viewProvider, 'provider-register':viewProviderRegister,
     'org-dash':viewOrgDash, 'org-cases':viewOrgCases, 'org-comms':viewOrgComms, 'org-register':viewOrgRegister, 'case':viewCaseDetail };
 
-  // Background syncs (15s poll, realtime pushes) call this on a timer regardless of what the
-  // user is doing. Without this, a re-render mid-typing would blow away any unsaved form input.
-  // Snapshot values + focus/cursor first, rebuild the DOM, then restore them.
+  /* Background syncs call this on a timer regardless of what the user is doing.
+     Snapshot typed values + focus/cursor first, rebuild the DOM, then restore them. */
   const activeEl = document.activeElement;
   const activeId = (activeEl && c.contains(activeEl) && activeEl.id) ? activeEl.id : null;
-  const selStart = activeEl && 'selectionStart' in activeEl ? activeEl.selectionStart : null;
-  const selEnd = activeEl && 'selectionEnd' in activeEl ? activeEl.selectionEnd : null;
+  const selStart = (activeEl && 'selectionStart' in activeEl) ? activeEl.selectionStart : null;
+  const selEnd = (activeEl && 'selectionEnd' in activeEl) ? activeEl.selectionEnd : null;
   const preserved = {};
-  c.querySelectorAll('input[id], textarea[id], select[id]').forEach(node=>{ preserved[node.id] = node.value; });
+  try{
+    c.querySelectorAll('input[id], textarea[id], select[id]').forEach(node=>{ preserved[node.id] = node.value; });
+  }catch(e){}
 
   try{
+    saveMapViewport();
     destroyMaps();
     c.innerHTML = (views[state.view] || viewFeed)();
   } catch(e){
-    // A throwing view (bad/missing field on a row, etc.) must not leave the page stuck
-    // silently — surface it and fall back to a safe, known-good screen instead of nothing.
+    /* A throwing view must not leave the page stuck silently — fall back to a safe screen. */
     console.error(`View "${state.view}" failed to render`, e);
-    try{ c.innerHTML = `<div class="empty-state">Something went wrong showing this page. <button class="btn btn-secondary" style="margin-top:10px;" onclick="setView('feed')">Go to Home</button></div>`; }catch(e2){}
+    try{ c.innerHTML = `<div class="empty-state">Something went wrong showing this page. <br><button class="btn btn-secondary" style="margin-top:10px;" onclick="setView('feed')">Go to Home</button></div>`; }catch(e2){}
   } finally {
-    // Restore unconditionally — even if something above (a throwing view, or map init below) fails, the user's typing must survive.
-    c.querySelectorAll('input[id], textarea[id], select[id]').forEach(node=>{
-      if(preserved[node.id] !== undefined) node.value = preserved[node.id];
-    });
-    if(activeId){
-      const toFocus = document.getElementById(activeId);
-      if(toFocus){
-        toFocus.focus();
-        if(selStart!==null && selEnd!==null && toFocus.setSelectionRange){
-          try{ toFocus.setSelectionRange(selStart, selEnd); }catch(e){}
+    try{
+      c.querySelectorAll('input[id], textarea[id], select[id]').forEach(node=>{
+        if(preserved[node.id] !== undefined && node.value !== preserved[node.id]) node.value = preserved[node.id];
+      });
+      if(activeId){
+        const toFocus = document.getElementById(activeId);
+        if(toFocus){
+          toFocus.focus();
+          if(selStart!==null && selEnd!==null && toFocus.setSelectionRange){
+            try{ toFocus.setSelectionRange(selStart, selEnd); }catch(e){}
+          }
         }
       }
-    }
+    }catch(e){}
   }
 
-  // Map init is separated and isolated: a Leaflet hiccup here must never wipe the form above.
+  /* Map init is isolated: a Leaflet hiccup here must never wipe the content above. */
   try{ initViewMaps(); }catch(e){ console.warn('Map init failed', e); }
 }
 
 /* ---------------- SHARED UI PIECES ---------------- */
 function confidenceBadge(inc){
-  const sources = new Set((Array.isArray(inc.timeline) ? inc.timeline : []).map(t=>t.source));
-  const dots = [...sources].map(s=>`<span class="cdot" style="background:${sourceColor[s]}"></span>`).join('');
-  return `<span class="confidence"><span class="confidence-dots">${dots}</span><span class="confidence-pct">${inc.confidence}%</span> confidence · ${inc.confirmations} confirmation${inc.confirmations===1?'':'s'}</span>`;
+  const tl = Array.isArray(inc.timeline) ? inc.timeline : [];
+  const sources = new Set(tl.map(t=>t && t.source).filter(Boolean));
+  const dots = [...sources].map(s=>`<span class="cdot" style="background:${sourceColor[s]||'var(--paper-dim)'}"></span>`).join('');
+  const conf = (typeof inc.confidence==='number') ? inc.confidence : 20;
+  const n = (typeof inc.confirmations==='number') ? inc.confirmations : 0;
+  return `<span class="confidence"><span class="confidence-dots">${dots}</span><span class="confidence-pct">${conf}%</span> confidence · ${n} confirmation${n===1?'':'s'}</span>`;
 }
 function severityColor(s){ return s==='high'?'var(--murram)': s==='medium'?'var(--ochre)':'var(--paper-dim)'; }
 function statusBadge(status){
-  const map = {active:['badge-pending','Active'], responding:['badge-official','Responding'], resolved:['badge-verified','Resolved'], 'in-progress':['badge-official','In progress']};
-  const [cls,label] = map[status] || ['badge-pending', status];
-  return `<span class="badge ${cls}">${label}</span>`;
+  const map = {active:['badge-pending','Active'], responding:['badge-official','Responding'], resolved:['badge-verified','Resolved'], 'in-progress':['badge-official','In progress'], pending:['badge-pending','Pending'], accepted:['badge-verified','Accepted']};
+  const [cls,label] = map[status] || ['badge-pending', status||'Unknown'];
+  return `<span class="badge ${cls}">${escapeHtml(label)}</span>`;
 }
 
 /* ---------------- FEED ---------------- */
 function viewFeed(){
-  const list = [...data.incidents].sort((a,b)=>b.createdAt-a.createdAt);
+  const list = [...data.incidents]
+    .filter(i=>i && matchesQuery((i.title||'')+' '+(i.category||'')+' '+(i.description||'')))
+    .sort((a,b)=>(Number(b.createdAt)||0)-(Number(a.createdAt)||0));
   return `
     <div class="page-head"><div><div class="page-title">What matters near you</div><div class="page-sub">Real reports from people using this app. Nothing here is simulated.</div></div></div>
+    ${searchChipHTML()}
     <div class="quick-actions">${qa('📝','Report','report')} ${qa('🗺️','Map','map')} ${qa('🛠️','Services','services')} ${qa('🔔','Alerts','alerts')}</div>
     ${list.length ? `<div class="grid grid-2">${list.map(feedCard).join('')}</div>`
-      : `<div class="empty-state"><div class="e-icon">📭</div>No incidents reported yet.<br><br><button class="btn btn-primary" onclick="setView('report')">Report the first one</button></div>`}
+      : state.searchQuery
+        ? `<div class="empty-state"><div class="e-icon">🔎</div>No incidents match “${escapeHtml(state.searchQuery)}”.<br><br><button class="btn btn-secondary" onclick="clearSearch()">Clear search</button></div>`
+        : `<div class="empty-state"><div class="e-icon">📭</div>No incidents reported yet.<br><br><button class="btn btn-primary" onclick="setView('report')">Report the first one</button></div>`}
   `;
 }
 function qa(icon,label,view){ return `<button class="qa-btn" onclick="setView('${view}')"><span class="qa-icon">${icon}</span><span class="qa-label">${label}</span></button>`; }
 function feedCard(inc){
-  return `<div class="card feed-item" onclick="openIncident('${inc.id}')">
-    <div class="feed-icon" style="background:${catColor[inc.category]||'var(--paper-dim)'}22; color:${catColor[inc.category]||'var(--paper-dim)'};">${catIcon[inc.category]||'📍'}</div>
+  if(!inc || inc.id==null) return '';
+  const color = catColor[inc.category]||'var(--paper-dim)';
+  return `<div class="card feed-item" onclick="openIncident('${q(inc.id)}')">
+    <div class="feed-icon" style="background:${color}22; color:${color};">${catIcon[inc.category]||'📍'}</div>
     <div class="feed-body">
-      <div class="feed-top"><span class="feed-title">${escapeHtml(inc.title)}</span>${statusBadge(inc.status)}</div>
-      <div class="feed-meta">${escapeHtml(inc.category)} · ${fmtAgo(inc.createdAt)} · Severity: <span style="color:${severityColor(inc.severity)}">${inc.severity}</span></div>
+      <div class="feed-top"><span class="feed-title">${escapeHtml(inc.title||'Untitled report')}</span>${statusBadge(inc.status||'active')}</div>
+      <div class="feed-meta">${escapeHtml(inc.category||'Other')} · ${fmtAgo(inc.createdAt)} · Severity: <span style="color:${severityColor(inc.severity)}">${escapeHtml(inc.severity||'medium')}</span></div>
       <div class="feed-foot">${confidenceBadge(inc)}</div>
     </div>
   </div>`;
 }
-function escapeHtml(s){ const d=document.createElement('div'); d.innerText=s||''; return d.innerHTML; }
 
-/* ---------------- MAP (real, Leaflet + OpenStreetMap) ---------------- */
+/* ---------------- MAP (real, Leaflet + OpenStreetMap, with offline fallback) ---------------- */
 let mainMap = null, miniMaps = {}, pinCoords = {rp:null, pv:null};
+let savedMapView = null;      /* preserve pan/zoom across background re-renders */
+let leafletDead = false, leafletAttempts = 0;
+const LEAFLET_MAX_ATTEMPTS = 40; /* ~12s, then show the no-map fallback instead of retrying forever */
 
 function viewMap(){
-  const showIncidents = state.mapFilters.incident ? data.incidents : [];
-  const showProviders = state.mapFilters.service ? data.providers : [];
+  const showIncidents = state.mapFilters.incident ? data.incidents.filter(i=>i && i.lat!=null && i.lng!=null) : [];
+  const showProviders = state.mapFilters.service ? data.providers.filter(p=>p && p.lat!=null && p.lng!=null) : [];
   const empty = !showIncidents.length && !showProviders.length;
   return `
     <div class="page-head"><div><div class="page-title">Map</div><div class="page-sub">Real locations on an actual street map — pinned by reporters and providers.</div></div></div>
     <div class="map-wrap">
+      ${leafletDead ? mainMapFallbackHTML(showIncidents, showProviders) : `
       <div id="leaflet-mainmap" style="position:absolute; inset:0;"></div>
       <div class="map-filters">${filterChip('incident','⚠️ Incidents')}${filterChip('service','🛠️ Services')}</div>
-      ${empty ? `<div class="empty-state" style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:1000; pointer-events:none;"><div class="e-icon">🗺️</div>Nothing on the map yet — report an incident or register as a provider.</div>` : ''}
-      <div class="map-legend"><div class="legend-item"><span class="legend-dot" style="background:var(--murram)"></span> High severity</div><div class="legend-item"><span class="legend-dot" style="background:var(--ochre)"></span> Medium</div><div class="legend-item"><span class="legend-dot" style="background:var(--savanna)"></span> Provider</div></div>
+      ${(!empty || store.get('hm_map_hint_dismissed')) ? '' : `
+      <div class="map-empty-hint" id="map-empty-hint">
+        <button class="meh-close" onclick="dismissMapHint()" title="Dismiss">✕</button>
+        <div class="meh-title">No pins here yet</div>
+        <div class="meh-sub">Be the first to put your mtaa on the map.</div>
+        <button class="btn btn-primary meh-btn" onclick="setView('report')">📝 Report incident</button>
+      </div>`}
+      <div class="map-legend"><div class="legend-item"><span class="legend-dot" style="background:var(--murram)"></span> High severity</div><div class="legend-item"><span class="legend-dot" style="background:var(--ochre)"></span> Medium</div><div class="legend-item"><span class="legend-dot" style="background:var(--savanna)"></span> Provider</div></div>`}
     </div>
   `;
 }
+function mainMapFallbackHTML(showIncidents, showProviders){
+  const items = [
+    ...showIncidents.map(i=>`<div class="card feed-item" onclick="openIncident('${q(i.id)}')"><div class="feed-icon" style="background:${severityColor(i.severity)}22;color:${severityColor(i.severity)};">${catIcon[i.category]||'📍'}</div><div class="feed-body"><div class="feed-top"><span class="feed-title">${escapeHtml(i.title||'Untitled')}</span>${statusBadge(i.status||'active')}</div><div class="feed-meta">${escapeHtml(i.category||'Other')} · ${fmtAgo(i.createdAt)}</div></div></div>`),
+    ...showProviders.map(p=>`<div class="card feed-item" onclick="openProvider('${q(p.id)}')"><div class="feed-icon" style="background:var(--savanna)22;color:var(--savanna);">🔧</div><div class="feed-body"><div class="feed-top"><span class="feed-title">${escapeHtml(p.name||'Unnamed')}</span></div><div class="feed-meta">${escapeHtml(p.category||'General')}</div></div></div>`)
+  ].join('');
+  return `<div class="map-filters">${filterChip('incident','⚠️ Incidents')}${filterChip('service','🛠️ Services')}</div>
+    <div class="map-fallback" style="padding-top:54px;">
+      <div class="map-fallback-note">🗺️ The interactive map library couldn't load (it needs a network connection) — showing the same places as a list instead. Everything still works.</div>
+      ${items || '<div class="empty-state"><div class="e-icon">📭</div>Nothing pinned yet.</div>'}
+    </div>`;
+}
 function filterChip(key,label){ return `<button class="filter-chip ${state.mapFilters[key]?'on':''}" onclick="toggleFilter('${key}')">${label}</button>`; }
 function toggleFilter(key){ state.mapFilters[key]=!state.mapFilters[key]; renderContent(); }
+function dismissMapHint(){
+  store.set('hm_map_hint_dismissed','1');
+  const el = document.getElementById('map-empty-hint');
+  if(el) el.style.display='none';
+}
+
+function saveMapViewport(){
+  if(!mainMap) return;
+  try{
+    const c = mainMap.getCenter();
+    savedMapView = {lat:c.lat, lng:c.lng, zoom:mainMap.getZoom()};
+  }catch(e){}
+}
 
 function initMainMap(){
   const container = document.getElementById('leaflet-mainmap');
   if(!container || typeof L==='undefined') return;
-  const center = state.userCoords || NAIROBI_FALLBACK;
-  mainMap = L.map(container, {zoomControl:true}).setView([center.lat, center.lng], 13);
+  if(container._leaflet_id){ try{ container._leaflet_id = null; }catch(e){} }
+  const start = savedMapView || state.userCoords || NAIROBI_FALLBACK;
+  mainMap = L.map(container, {zoomControl:false}).setView([start.lat, start.lng], savedMapView ? savedMapView.zoom : 13);
+  try{ L.control.zoom({position:'bottomright'}).addTo(mainMap); }catch(e){}
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(mainMap);
 
   const showIncidents = state.mapFilters.incident ? data.incidents : [];
   const showProviders = state.mapFilters.service ? data.providers : [];
   showIncidents.forEach(inc=>{
-    if(inc.lat==null || inc.lng==null) return;
-    const icon = L.divIcon({html:`<div class="lf-pin" style="background:${severityColor(inc.severity)}"><span>${catIcon[inc.category]||'!'}</span></div>`, className:'', iconSize:[30,30], iconAnchor:[15,30]});
-    L.marker([inc.lat, inc.lng], {icon}).addTo(mainMap).bindTooltip(inc.title).on('click', ()=>openIncident(inc.id));
+    if(!inc || inc.lat==null || inc.lng==null) return;
+    try{
+      const icon = L.divIcon({html:`<div class="lf-pin" style="background:${severityColor(inc.severity)}"><span>${catIcon[inc.category]||'!'}</span></div>`, className:'', iconSize:[30,30], iconAnchor:[15,30]});
+      L.marker([inc.lat, inc.lng], {icon}).addTo(mainMap).bindTooltip(String(inc.title||'Incident')).on('click', ()=>openIncident(inc.id));
+    }catch(e){}
   });
   showProviders.forEach(p=>{
-    if(p.lat==null || p.lng==null) return;
-    const icon = L.divIcon({html:`<div class="lf-pin" style="background:var(--savanna)"><span>🔧</span></div>`, className:'', iconSize:[30,30], iconAnchor:[15,30]});
-    L.marker([p.lat, p.lng], {icon}).addTo(mainMap).bindTooltip(p.name).on('click', ()=>openProvider(p.id));
+    if(!p || p.lat==null || p.lng==null) return;
+    try{
+      const icon = L.divIcon({html:`<div class="lf-pin" style="background:var(--savanna)"><span>🔧</span></div>`, className:'', iconSize:[30,30], iconAnchor:[15,30]});
+      L.marker([p.lat, p.lng], {icon}).addTo(mainMap).bindTooltip(String(p.name||'Provider')).on('click', ()=>openProvider(p.id));
+    }catch(e){}
   });
   if(state.userCoords){
-    const youIcon = L.divIcon({html:`<div class="lf-pin-you"></div>`, className:'', iconSize:[16,16], iconAnchor:[8,8]});
-    L.marker([state.userCoords.lat, state.userCoords.lng], {icon:youIcon}).addTo(mainMap).bindTooltip('You are here');
-    if(state.userAccuracy){
-      L.circle([state.userCoords.lat, state.userCoords.lng], {radius:state.userAccuracy, color:'#5C86A8', weight:1, fillColor:'#5C86A8', fillOpacity:0.12}).addTo(mainMap);
-    }
-    // If the map was drawn before geolocation resolved, recenter now that we have a real fix.
-    if(!state.userAccuracy || state.userAccuracy > 2000){
-      // very coarse fix (>2km) — zoom out slightly so the accuracy circle stays visible/honest
-      mainMap.setView([state.userCoords.lat, state.userCoords.lng], 11);
-    }
+    try{
+      const youIcon = L.divIcon({html:`<div class="lf-pin-you"></div>`, className:'', iconSize:[16,16], iconAnchor:[8,8]});
+      L.marker([state.userCoords.lat, state.userCoords.lng], {icon:youIcon}).addTo(mainMap).bindTooltip('You are here');
+      if(state.userAccuracy){
+        L.circle([state.userCoords.lat, state.userCoords.lng], {radius:state.userAccuracy, color:'#5C86A8', weight:1, fillColor:'#5C86A8', fillOpacity:0.12}).addTo(mainMap);
+      }
+      if(!savedMapView && (!state.userAccuracy || state.userAccuracy > 2000)){
+        mainMap.setView([state.userCoords.lat, state.userCoords.lng], 11); /* coarse fix — zoom out so it stays honest */
+      }
+    }catch(e){}
   }
 }
 
 function initMiniMap(key){
   const container = document.getElementById(key+'-map');
   if(!container || typeof L==='undefined') return;
+  if(container._leaflet_id){ try{ container._leaflet_id = null; }catch(e){} }
   const start = pinCoords[key] || state.userCoords || NAIROBI_FALLBACK;
-  const map = L.map(container, {zoomControl:false, attributionControl:false}).setView([start.lat, start.lng], pinCoords[key] ? 16 : 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(map);
+  let map;
+  try{
+    map = L.map(container, {zoomControl:false, attributionControl:true}).setView([start.lat, start.lng], pinCoords[key] ? 16 : 13);
+    map.attributionControl.setPrefix(false);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+  }catch(e){
+    container.innerHTML = `<div class="map-fallback-note">Mini-map unavailable — use “Use my location” or the coordinates below.</div>`;
+    return;
+  }
   let marker = null;
   function setPin(latlng){
     pinCoords[key] = {lat:latlng.lat, lng:latlng.lng};
-    const icon = L.divIcon({html:'<div class="lf-pin-mini"></div>', className:'', iconSize:[22,22], iconAnchor:[11,22]});
-    if(marker) marker.setLatLng(latlng); else marker = L.marker(latlng,{icon}).addTo(map);
+    try{
+      const icon = L.divIcon({html:'<div class="lf-pin-mini"></div>', className:'', iconSize:[22,22], iconAnchor:[11,22]});
+      if(marker) marker.setLatLng(latlng); else marker = L.marker(latlng,{icon}).addTo(map);
+    }catch(e){}
     const status = document.getElementById(key+'-geo-status');
     if(status) status.textContent = `Pinned at ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}`;
   }
-  if(pinCoords[key]) setPin(L.latLng(pinCoords[key].lat, pinCoords[key].lng));
-  map.on('click', e=>setPin(e.latlng));
+  if(pinCoords[key]){ try{ setPin(L.latLng(pinCoords[key].lat, pinCoords[key].lng)); }catch(e){} }
+  try{ map.on('click', e=>setPin(e.latlng)); }catch(e){}
   miniMaps[key] = map;
 }
 
@@ -663,39 +1110,75 @@ function useMyLocationFor(key){
   requestGeolocation((coords)=>{
     if(btn) btn.classList.remove('locating');
     if(!coords){ toast('Location unavailable', 'Could not get your device location — tap the map to place a pin manually.', '⚠️'); return; }
+    pinCoords[key] = {lat:coords.lat, lng:coords.lng};
     const map = miniMaps[key];
-    if(map){ map.setView([coords.lat, coords.lng], 16); map.fire('click', {latlng: L.latLng(coords.lat, coords.lng)}); }
+    if(map && typeof L!=='undefined'){
+      try{
+        map.setView([coords.lat, coords.lng], 16);
+        map.fire('click', {latlng: L.latLng(coords.lat, coords.lng)});
+      }catch(e){}
+    }
+    const status = document.getElementById(key+'-geo-status');
+    if(status) status.textContent = `Pinned at ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
   });
 }
 
+/* Manual coordinates fallback when the map library can't load */
+function applyManualCoords(key){
+  const lat = parseFloat(val(key+'-lat'));
+  const lng = parseFloat(val(key+'-lng'));
+  if(!isFinite(lat) || !isFinite(lng) || lat<-90 || lat>90 || lng<-180 || lng>180){
+    toast('Invalid coordinates', 'Enter a valid latitude (-90…90) and longitude (-180…180).', '⚠️');
+    return;
+  }
+  pinCoords[key] = {lat, lng};
+  const status = document.getElementById(key+'-geo-status');
+  if(status) status.textContent = `Pinned at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  toast('Location set', 'Pinned from the coordinates you entered.', '📍');
+}
+
 function destroyMaps(){
-  if(mainMap){ mainMap.remove(); mainMap=null; }
-  Object.keys(miniMaps).forEach(k=>{ miniMaps[k].remove(); }); miniMaps={};
+  if(mainMap){ try{ mainMap.remove(); }catch(e){} mainMap=null; }
+  Object.keys(miniMaps).forEach(k=>{ try{ miniMaps[k].remove(); }catch(e){} });
+  miniMaps={};
 }
 function initViewMaps(){
-  if(typeof L==='undefined'){ setTimeout(initViewMaps, 300); return; }
-  if(state.view==='map') initMainMap();
-  if(state.view==='report') initMiniMap('rp');
-  if(state.view==='provider-register') initMiniMap('pv');
+  if(typeof L==='undefined'){
+    if(leafletDead) return;
+    if(++leafletAttempts >= LEAFLET_MAX_ATTEMPTS){
+      leafletDead = true;
+      console.warn('Leaflet map library failed to load — showing list/coordinate fallbacks.');
+      if(state.view==='map' || state.view==='report' || state.view==='provider-register') renderContent();
+      return;
+    }
+    setTimeout(initViewMaps, 300);
+    return;
+  }
+  leafletAttempts = 0;
+  try{ if(state.view==='map') initMainMap(); }catch(e){ console.warn('Main map failed', e); }
+  try{ if(state.view==='report') initMiniMap('rp'); }catch(e){ console.warn('Mini map failed', e); }
+  try{ if(state.view==='provider-register') initMiniMap('pv'); }catch(e){ console.warn('Mini map failed', e); }
 }
 
 /* ---------------- INCIDENT DETAIL ---------------- */
 function openIncident(id){ state.selectedIncident=id; setView('incident'); }
 function viewIncident(){
-  const inc = data.incidents.find(i=>i.id===state.selectedIncident);
-  if(!inc) return `<div class="empty-state">Incident not found.</div>`;
-  const linkedCase = data.cases.find(c=>c.incidentId===inc.id);
-  const alreadyConfirmedByMe = Array.isArray(inc.confirmedBy) && inc.confirmedBy.includes(getDeviceId());
+  const inc = data.incidents.find(i=>i && i.id===state.selectedIncident);
+  if(!inc) return `<div class="empty-state">Incident not found. It may have been removed.<br><br><button class="btn btn-secondary" onclick="setView('feed')">Go to Home</button></div>`;
+  const linkedCase = data.cases.find(c=>c && c.incidentId===inc.id);
+  const confirmedBy = Array.isArray(inc.confirmedBy) ? inc.confirmedBy : [];
+  const alreadyConfirmedByMe = confirmedBy.includes(getDeviceId());
+  const tl = Array.isArray(inc.timeline) ? inc.timeline : [];
   return `
     <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="setView(state.role==='org'?'org-cases':'feed')">← Back</button>
-    <div class="page-head"><div><div class="page-title">${escapeHtml(inc.title)}</div><div class="page-sub">${escapeHtml(inc.category)} · Reported ${fmtAgo(inc.createdAt)} by ${escapeHtml(inc.reportedBy||'Anonymous resident')} · Severity <b style="color:${severityColor(inc.severity)}">${inc.severity}</b></div></div>${statusBadge(inc.status)}</div>
+    <div class="page-head"><div><div class="page-title">${escapeHtml(inc.title||'Untitled report')}</div><div class="page-sub">${escapeHtml(inc.category||'Other')} · Reported ${fmtAgo(inc.createdAt)} by ${escapeHtml(inc.reportedBy||'Anonymous resident')} · Severity <b style="color:${severityColor(inc.severity)}">${escapeHtml(inc.severity||'medium')}</b></div></div>${statusBadge(inc.status||'active')}</div>
     <div class="grid grid-2">
       <div class="card">
         <div style="font-weight:700; font-size:13px; margin-bottom:12px;">Confidence & sources</div>
         ${confidenceBadge(inc)}
         <div style="margin-top:14px; font-size:12.5px; color:var(--paper-dim); line-height:1.6;">This is a community report, not confirmed fact, until independently corroborated.</div>
         <div style="margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="confirmIncident('${inc.id}')" ${state.role!=='resident'||alreadyConfirmedByMe?'disabled':''}>${alreadyConfirmedByMe?'✓ You confirmed this':'✓ I can confirm this'}</button>
+          <button class="btn btn-primary" onclick="confirmIncident('${q(inc.id)}')" ${state.role!=='resident'||alreadyConfirmedByMe?'disabled':''}>${alreadyConfirmedByMe?'✓ You confirmed this':'✓ I can confirm this'}</button>
         </div>
         ${state.role==='org' ? orgIncidentActions(inc, linkedCase) : ''}
       </div>
@@ -706,12 +1189,12 @@ function viewIncident(){
     </div>
     <div class="card" style="margin-top:14px;">
       <div style="font-weight:700; font-size:13px; margin-bottom:14px;">Timeline</div>
-      <div class="timeline">${(Array.isArray(inc.timeline) ? inc.timeline : []).map(t=>`
-          <div class="tl-item"><div class="tl-dot" style="background:${sourceColor[t.source]}"></div>
+      ${tl.length ? `<div class="timeline">${tl.map(t=>`
+          <div class="tl-item"><div class="tl-dot" style="background:${sourceColor[t.source]||'var(--paper-dim)'}"></div>
             <div class="tl-time">${fmtTime(t.time)} · ${fmtAgo(t.time)}</div>
             <div class="tl-text">${escapeHtml(t.text)}</div>
             <div class="tl-source">${escapeHtml(t.by)}</div></div>`).join('')}
-      </div>
+      </div>` : '<div class="feed-meta">No timeline entries yet.</div>'}
     </div>
   `;
 }
@@ -719,14 +1202,14 @@ function orgIncidentActions(inc, linkedCase){
   return `<div style="margin-top:14px; border-top:1px solid var(--line); padding-top:14px;">
     <div style="font-weight:700; font-size:12px; margin-bottom:8px; color:var(--paper-dim);">ORGANIZATION ACTIONS</div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      ${!linkedCase ? `<button class="btn btn-secondary" onclick="openCaseFor('${inc.id}')">Open a case</button>` : ''}
-      <button class="btn btn-secondary" onclick="advanceIncident('${inc.id}','responding')">Mark: Responding</button>
-      <button class="btn btn-secondary" onclick="advanceIncident('${inc.id}','resolved')">Mark: Resolved</button>
+      ${!linkedCase ? `<button class="btn btn-secondary" onclick="openCaseFor('${q(inc.id)}')">Open a case</button>` : ''}
+      <button class="btn btn-secondary" onclick="advanceIncident('${q(inc.id)}','responding')">Mark: Responding</button>
+      <button class="btn btn-secondary" onclick="advanceIncident('${q(inc.id)}','resolved')">Mark: Resolved</button>
     </div>
   </div>`;
 }
 async function confirmIncident(id){
-  const inc = data.incidents.find(i=>i.id===id);
+  const inc = data.incidents.find(i=>i && i.id===id);
   if(!inc) return;
   if(!Array.isArray(inc.confirmedBy)) inc.confirmedBy = [];
   const me = getDeviceId();
@@ -735,65 +1218,78 @@ async function confirmIncident(id){
     return;
   }
   inc.confirmedBy.push(me);
-  inc.confirmations += 1;
-  inc.confidence = Math.min(96, inc.confidence + 6);
+  inc.confirmations = (typeof inc.confirmations==='number'?inc.confirmations:0) + 1;
+  inc.confidence = Math.min(96, (typeof inc.confidence==='number'?inc.confidence:20) + 6);
   if(!Array.isArray(inc.timeline)) inc.timeline = [];
   inc.timeline.push({time:now(), text:'A resident confirmed this incident. Confidence updated.', source:'community', by:'Resident confirmation'});
-  await persist('incidents');
-  toast('Confirmation recorded', `Confidence is now ${inc.confidence}%.`, '✅');
+  const res = await saveRow('incidents', inc);
+  toast('Confirmation recorded', res.synced ? `Confidence is now ${inc.confidence}%.` : `Confidence is now ${inc.confidence}%. Will sync when you're back online.`, '✅');
   renderContent();
 }
 async function advanceIncident(id, status){ return guardOnce('advanceIncident:'+id+':'+status, async ()=>{
-  const inc = data.incidents.find(i=>i.id===id);
+  const inc = data.incidents.find(i=>i && i.id===id);
   if(!inc || inc.status===status) return;
   inc.status = status;
   const label = status==='responding' ? 'Response dispatched by organization.' : 'Marked resolved by organization.';
   if(!Array.isArray(inc.timeline)) inc.timeline = [];
   inc.timeline.push({time:now(), text:label, source:'official', by: activeOrgName()});
-  const c = data.cases.find(c=>c.incidentId===id);
-  if(c){ c.status = status==='resolved'?'resolved':'in-progress'; c.updatedAt = now(); await persist('cases'); }
-  await persist('incidents');
+  const c = data.cases.find(c=>c && c.incidentId===id);
+  if(c){ c.status = status==='resolved'?'resolved':'in-progress'; c.updatedAt = now(); await saveRow('cases', c); }
+  await saveRow('incidents', inc);
   if(status==='resolved'){
-    data.alerts.unshift({id:uid('a'), title:'Resolved', body:`"${inc.title}" has been marked resolved.`, time:now(), read:false, level:'success'});
-    await persist('alerts');
+    const alert = {id:uid('a'), title:'Resolved', body:`"${inc.title||'An incident'}" has been marked resolved.`, time:now(), level:'success'};
+    data.alerts.unshift(alert);
+    await saveRow('alerts', alert);
   }
   toast('Status updated', label, '📣');
   renderContent();
 });}
 async function openCaseFor(incidentId){ return guardOnce('openCaseFor:'+incidentId, async ()=>{
-  if(data.cases.some(c=>c.incidentId===incidentId)) return; // a case already exists for this incident
-  const inc = data.incidents.find(i=>i.id===incidentId);
-  const c = {id:uid('case'), incidentId, org:activeOrgName(), title:inc.title, status:'in-progress', priority:inc.severity, assignedTeam:'Unassigned', updatedAt:now()};
+  if(data.cases.some(c=>c && c.incidentId===incidentId)) return; /* a case already exists for this incident */
+  const inc = data.incidents.find(i=>i && i.id===incidentId);
+  if(!inc) return;
+  const c = {id:uid('case'), incidentId, org:activeOrgName(), title:inc.title||'Untitled', status:'in-progress', priority:inc.severity||'medium', assignedTeam:'Unassigned', updatedAt:now()};
   data.cases.unshift(c);
-  await persist('cases');
+  await saveRow('cases', c);
   toast('Case opened', 'This incident now has an operational case.', '🗂️');
   renderContent();
 });}
-function activeOrgName(){ return data.orgs[0] ? data.orgs[0].name : 'Responding organization'; }
+function activeOrgName(){ return (data.orgs[0] && data.orgs[0].name) ? data.orgs[0].name : 'Responding organization'; }
 function miniMapField(key, hintText){
+  const pinText = pinCoords[key]
+    ? `Pinned at ${pinCoords[key].lat.toFixed(5)}, ${pinCoords[key].lng.toFixed(5)}`
+    : 'No pin placed yet — tap the map or use your location';
+  const mapOrFallback = leafletDead
+    ? `<div class="mini-fallback"><div class="hint" style="margin:0;">Map tiles need a network connection — enter coordinates manually instead.</div><div class="mf-row"><input id="${key}-lat" inputmode="decimal" placeholder="Latitude, e.g. -1.29210"><input id="${key}-lng" inputmode="decimal" placeholder="Longitude, e.g. 36.82190"></div><div><button type="button" class="btn btn-secondary" onclick="applyManualCoords('${key}')">Use these coordinates</button></div></div>`
+    : `<div class="mini-map" id="${key}-map"></div>`;
   return `<div class="field"><label>Location on map</label>
-    <div class="mini-map" id="${key}-map"></div>
-    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+    ${mapOrFallback}
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:6px;">
       <div class="hint">${hintText}</div>
       <button type="button" class="locate-btn" id="${key}-locate-btn" onclick="useMyLocationFor('${key}')">📍 Use my location</button>
     </div>
-    <div class="geo-status" id="${key}-geo-status">${pinCoords[key] ? `Pinned at ${pinCoords[key].lat.toFixed(5)}, ${pinCoords[key].lng.toFixed(5)}` : 'No pin placed yet — tap the map or use your location'}</div>
+    <div class="geo-status" id="${key}-geo-status">${pinText}</div>
   </div>`;
 }
 
 /* ---------------- SERVICES / PROVIDERS ---------------- */
 function viewServices(){
+  const list = data.providers.filter(p=>p && matchesQuery((p.name||'')+' '+(p.category||'')+' '+(p.blurb||'')));
   return `
     <div class="page-head"><div><div class="page-title">Find help</div><div class="page-sub">Providers who have registered themselves on this app.</div></div>
       <button class="btn btn-secondary" onclick="setView('provider-register')">+ Register as a provider</button></div>
-    ${data.providers.length ? `<div class="grid grid-3">${data.providers.map(providerCard).join('')}</div>`
-      : `<div class="empty-state"><div class="e-icon">🛠️</div>No providers registered yet.<br><br><button class="btn btn-primary" onclick="setView('provider-register')">Register the first one</button></div>`}
+    ${searchChipHTML()}
+    ${list.length ? `<div class="grid grid-3">${list.map(providerCard).join('')}</div>`
+      : state.searchQuery
+        ? `<div class="empty-state"><div class="e-icon">🔎</div>No providers match “${escapeHtml(state.searchQuery)}”.<br><br><button class="btn btn-secondary" onclick="clearSearch()">Clear search</button></div>`
+        : `<div class="empty-state"><div class="e-icon">🛠️</div>No providers registered yet.<br><br><button class="btn btn-primary" onclick="setView('provider-register')">Register the first one</button></div>`}
   `;
 }
 function providerCard(p){
-  return `<div class="card" onclick="openProvider('${p.id}')" style="cursor:pointer;">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start;"><div style="font-weight:700; font-size:14px;">${escapeHtml(p.name)}</div>${p.verified?'<span class="badge badge-verified">✓ Verified</span>':'<span class="badge badge-pending">Unverified</span>'}</div>
-    <div class="feed-meta" style="margin-top:4px;">${escapeHtml(p.category)}</div>
+  if(!p || p.id==null) return '';
+  return `<div class="card" onclick="openProvider('${q(p.id)}')" style="cursor:pointer;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start;"><div style="font-weight:700; font-size:14px;">${escapeHtml(p.name||'Unnamed provider')}</div>${p.verified?'<span class="badge badge-verified">✓ Verified</span>':'<span class="badge badge-pending">Unverified</span>'}</div>
+    <div class="feed-meta" style="margin-top:4px;">${escapeHtml(p.category||'General')}</div>
     <div style="font-size:12.5px; color:var(--paper-dim); margin-top:8px; line-height:1.5;">${escapeHtml(p.blurb||'')}</div>
     ${p.price ? `<div style="margin-top:12px; font-weight:700; font-size:13px;">${escapeHtml(p.price)}</div>` : ''}
   </div>`;
@@ -813,61 +1309,67 @@ function viewProviderRegister(){
   `;
 }
 async function submitProvider(){ return guardOnce('submitProvider', async ()=>{
-  const name = document.getElementById('pv-name').value.trim();
-  const category = document.getElementById('pv-category').value.trim();
+  const name = val('pv-name');
+  const category = val('pv-category');
   if(!name || !category){ toast('Missing info', 'Name and category are required.', '⚠️'); return; }
-  if(!pinCoords.pv){ toast('Missing location', 'Tap the map or use your location to set where you operate.', '⚠️'); return; }
-  const p = {id:uid('p'), name, category, blurb:document.getElementById('pv-blurb').value.trim(),
-    price:document.getElementById('pv-price').value.trim(), verified:false,
+  if(!pinCoords.pv){ toast('Missing location', 'Tap the map, use your location, or enter coordinates to set where you operate.', '⚠️'); return; }
+  const p = {id:uid('p'), name, category, blurb:val('pv-blurb'),
+    price:val('pv-price'), verified:false,
     lat:pinCoords.pv.lat, lng:pinCoords.pv.lng, createdAt:now()};
   data.providers.unshift(p);
-  const saved = await persist('providers');
+  const res = await saveRow('providers', p);
   pinCoords.pv = null;
-  if(saved) toast('Provider registered', 'Your listing is live and marked unverified.', '✅');
+  toast('Provider registered', res.synced ? 'Your listing is live and marked unverified.' : 'Saved on this device — will sync when you’re back online.', '✅');
   setView('services');
 });}
 function openProvider(id){ state.selectedProvider=id; setView('provider'); }
 function viewProvider(){
-  const p = data.providers.find(p=>p.id===state.selectedProvider);
+  const p = data.providers.find(p=>p && p.id===state.selectedProvider);
   if(!p) return `<div class="empty-state">Select a provider from Services.</div>`;
   return `
     <button class="btn btn-ghost" style="margin-bottom:16px;" onclick="setView('services')">← Back to Services</button>
-    <div class="page-head"><div><div class="page-title">${escapeHtml(p.name)}</div><div class="page-sub">${escapeHtml(p.category)} ${p.verified?'· ✓ Verified':'· Verification pending'}</div></div></div>
+    <div class="page-head"><div><div class="page-title">${escapeHtml(p.name||'Unnamed provider')}</div><div class="page-sub">${escapeHtml(p.category||'General')} ${p.verified?'· ✓ Verified':'· Verification pending'}</div></div></div>
     <div class="grid grid-2">
       <div class="card"><div style="font-weight:700; font-size:13px; margin-bottom:10px;">About</div><div style="font-size:13px; color:var(--paper-dim); line-height:1.6;">${escapeHtml(p.blurb||'No description provided.')}</div>${p.price?`<div style="margin-top:14px; font-weight:700;">${escapeHtml(p.price)}</div>`:''}</div>
       <div class="card">
         <div style="font-weight:700; font-size:13px; margin-bottom:12px;">Request this service</div>
         <div class="field"><label>What do you need?</label><input id="bk-desc" placeholder="Describe what you need"></div>
         <div class="field"><label>Your name (optional)</label><input id="bk-name" placeholder="So the provider knows who's asking"></div>
-        <button class="btn btn-primary" onclick="requestBooking('${p.id}')">Request service</button>
+        <button class="btn btn-primary" onclick="requestBooking('${q(p.id)}')">Request service</button>
       </div>
     </div>
   `;
 }
 async function requestBooking(pid){ return guardOnce('requestBooking:'+pid, async ()=>{
-  const p = data.providers.find(p=>p.id===pid);
-  const desc = document.getElementById('bk-desc').value.trim();
+  const p = data.providers.find(p=>p && p.id===pid);
+  if(!p){ toast('Provider not found', 'That listing may have been removed.', '⚠️'); return; }
+  const desc = val('bk-desc');
   if(!desc){ toast('Missing info', 'Describe what you need first.', '⚠️'); return; }
-  const requester = document.getElementById('bk-name').value.trim() || 'Anonymous resident';
-  const b = {id:uid('bk'), providerId:pid, providerName:p.name, desc, requester, status:'pending', time:now()};
+  const requester = val('bk-name') || 'Anonymous resident';
+  const b = {id:uid('bk'), providerId:pid, providerName:p.name||'Provider', desc, requester, deviceId:getDeviceId(), status:'pending', time:now()};
   data.bookings.unshift(b);
-  const saved = await persist('bookings');
-  if(saved) toast('Request sent', `${p.name} has been notified.`, '📩');
+  const res = await saveRow('bookings', b);
+  toast('Request sent', res.synced ? `${p.name||'The provider'} has been notified.` : 'Saved on this device — will sync when you’re back online.', '📩');
   setView('bookings');
 });}
+function myBookings(){
+  const me = getDeviceId();
+  return data.bookings.filter(b=>b && (!b.deviceId || b.deviceId===me));
+}
 function viewBookings(){
-  if(!data.bookings.length) return `<div class="page-head"><div class="page-title">My Requests</div></div><div class="empty-state"><div class="e-icon">📋</div>No service requests yet.</div>`;
+  const mine = myBookings();
+  if(!mine.length) return `<div class="page-head"><div class="page-title">My Requests</div></div><div class="empty-state"><div class="e-icon">📋</div>No service requests yet.</div>`;
   return `<div class="page-head"><div><div class="page-title">My Requests</div></div></div><div class="grid grid-2">
-    ${data.bookings.map(b=>`<div class="card"><div style="display:flex; justify-content:space-between;"><div style="font-weight:700; font-size:14px;">${escapeHtml(b.providerName)}</div><span class="badge ${b.status==='pending'?'badge-pending':'badge-verified'}">${b.status}</span></div>
-      <div class="feed-meta" style="margin-top:4px;">${escapeHtml(b.desc)}</div><div class="feed-meta" style="margin-top:6px;">Requested ${fmtAgo(b.time)}</div>
-      ${b.status==='pending'?`<button class="btn btn-secondary" style="margin-top:10px;" onclick="acceptBooking('${b.id}')">Mark accepted by provider</button>`:''}</div>`).join('')}</div>`;
+    ${mine.map(b=>`<div class="card"><div style="display:flex; justify-content:space-between;"><div style="font-weight:700; font-size:14px;">${escapeHtml(b.providerName||'Provider')}</div><span class="badge ${b.status==='pending'?'badge-pending':'badge-verified'}">${escapeHtml(b.status||'pending')}</span></div>
+      <div class="feed-meta" style="margin-top:4px;">${escapeHtml(b.desc||'')}</div><div class="feed-meta" style="margin-top:6px;">Requested ${fmtAgo(b.time)}</div>
+      ${b.status==='pending'?`<button class="btn btn-secondary" style="margin-top:10px;" onclick="acceptBooking('${q(b.id)}')">Mark accepted by provider</button>`:''}</div>`).join('')}</div>`;
 }
 async function acceptBooking(id){ return guardOnce('acceptBooking:'+id, async ()=>{
-  const b = data.bookings.find(b=>b.id===id);
+  const b = data.bookings.find(b=>b && b.id===id);
   if(!b || b.status==='accepted') return;
   b.status='accepted';
-  const saved = await persist('bookings');
-  if(saved) toast('Booking accepted', `${b.providerName} accepted the request.`, '✅');
+  await saveRow('bookings', b);
+  toast('Booking accepted', `${b.providerName||'The provider'} accepted the request.`, '✅');
   renderContent();
 });}
 
@@ -892,15 +1394,18 @@ function viewReport(){
   `;
 }
 let pickedSeverity = 'medium';
-function pickSeverity(s){ pickedSeverity=s; ['low','medium','high'].forEach(x=>document.getElementById('sev-'+x).classList.toggle('on', x===s)); }
+function pickSeverity(s){
+  pickedSeverity=s;
+  ['low','medium','high'].forEach(x=>{ const el=document.getElementById('sev-'+x); if(el) el.classList.toggle('on', x===s); });
+}
 async function submitReport(){ return guardOnce('submitReport', async ()=>{
-  const title = document.getElementById('rp-title').value.trim();
-  const desc = document.getElementById('rp-desc').value.trim();
+  const title = val('rp-title');
+  const desc = val('rp-desc');
   if(!title){ toast('Missing info', 'Give the report a short title.', '⚠️'); return; }
-  if(!pinCoords.rp){ toast('Missing location', 'Tap the map or use your location to mark where this is happening.', '⚠️'); return; }
-  const category = document.getElementById('rp-category').value.trim();
+  if(!pinCoords.rp){ toast('Missing location', 'Tap the map, use your location, or enter coordinates to mark where this is happening.', '⚠️'); return; }
+  const category = val('rp-category');
   if(!category){ toast('Missing info', 'Enter a category for this report.', '⚠️'); return; }
-  const reportedBy = document.getElementById('rp-name').value.trim() || 'Anonymous resident';
+  const reportedBy = val('rp-name') || 'Anonymous resident';
   const inc = {
     id:uid('inc'), title, category, description:desc, severity:pickedSeverity, status:'active',
     confidence:20, confirmations:0, reportedBy, createdAt:now(),
@@ -908,21 +1413,19 @@ async function submitReport(){ return guardOnce('submitReport', async ()=>{
     timeline:[{time:now(), text:'Report submitted.', source:'community', by:reportedBy}],
   };
   data.incidents.unshift(inc);
-  const saved = await persist('incidents');
-  if(saved) toast('Report submitted', 'Your incident is now live.', '📝');
+  const res = await saveRow('incidents', inc);
+  toast('Report submitted', res.synced ? 'Your incident is now live.' : 'Saved on this device — will sync when you’re back online.', '📝');
   pickedSeverity='medium'; pinCoords.rp=null;
   openIncident(inc.id);
 });}
 
 /* ---------------- ALERTS ---------------- */
 function viewAlerts(){
-  const wasUnread = data.alerts.some(a=>!a.read);
-  data.alerts.forEach(a=>a.read=true);
-  if(wasUnread) persist('alerts');
+  markAllAlertsReadLocally(); /* local "read" only — other devices keep their own unread state */
   return `<div class="page-head"><div><div class="page-title">Alerts</div><div class="page-sub">Generated automatically from real status changes on incidents you'd follow.</div></div></div>
-    ${data.alerts.length ? `<div class="grid grid-2">${data.alerts.map(a=>`
+    ${data.alerts.length ? `<div class="grid grid-2">${data.alerts.map(a=>a?`
       <div class="card"><div style="display:flex; gap:10px;"><span style="font-size:16px;">${a.level==='success'?'✅':a.level==='warning'?'⚠️':'🔔'}</span>
-        <div><div style="font-weight:700; font-size:13.5px;">${escapeHtml(a.title)}</div><div style="font-size:12.5px; color:var(--paper-dim); margin-top:4px; line-height:1.5;">${escapeHtml(a.body)}</div><div class="feed-meta" style="margin-top:8px;">${fmtAgo(a.time)}</div></div></div></div>`).join('')}</div>`
+        <div><div style="font-weight:700; font-size:13.5px;">${escapeHtml(a.title||'Alert')}</div><div style="font-size:12.5px; color:var(--paper-dim); margin-top:4px; line-height:1.5;">${escapeHtml(a.body||'')}</div><div class="feed-meta" style="margin-top:8px;">${fmtAgo(a.time)}</div></div></div></div>`:'').join('')}</div>`
       : `<div class="empty-state">No alerts yet.</div>`}`;
 }
 
@@ -936,82 +1439,104 @@ function viewOrgRegister(){
     </div>`;
 }
 async function submitOrg(){ return guardOnce('submitOrg', async ()=>{
-  const name = document.getElementById('org-name').value.trim();
+  const name = val('org-name');
   if(!name){ toast('Missing info','Organization name required.','⚠️'); return; }
-  const sector = document.getElementById('org-sector').value.trim();
-  data.orgs.unshift({id:uid('org'), name, sector, verified:false, createdAt:now()});
-  const saved = await persist('orgs');
-  if(saved) toast('Organization registered', 'Unverified until confirmed by Hali Mtaani.', '✅');
+  const sector = val('org-sector');
+  const org = {id:uid('org'), name, sector, verified:false, createdAt:now()};
+  data.orgs.unshift(org);
+  const res = await saveRow('orgs', org);
+  toast('Organization registered', res.synced ? 'Unverified until confirmed by Hali Mtaani.' : 'Saved on this device — will sync when you’re back online.', '✅');
   setView('org-dash');
 });}
 function viewOrgDash(){
   if(!data.orgs.length){
     return `<div class="page-head"><div><div class="page-title">Operations Dashboard</div></div></div><div class="empty-state"><div class="e-icon">🏢</div>No organization registered yet.<br><br><button class="btn btn-primary" onclick="setView('org-register')">Register your organization</button></div>`;
   }
-  const active = data.incidents.filter(i=>i.status!=='resolved').length;
-  const resolved = data.incidents.filter(i=>i.status==='resolved').length;
+  const active = data.incidents.filter(i=>i && i.status!=='resolved').length;
+  const resolved = data.incidents.filter(i=>i && i.status==='resolved').length;
   return `<div class="page-head"><div><div class="page-title">Operations Dashboard</div><div class="page-sub">${escapeHtml(activeOrgName())}${data.orgs[0].verified?' · ✓ Verified':' · Unverified'}</div></div></div>
     <div class="grid grid-3" style="margin-bottom:16px;">${statCard(active,'Active incidents')}${statCard(data.cases.length,'Open cases')}${statCard(resolved,'Resolved')}</div>
     <div class="card"><div style="font-weight:700; font-size:13px; margin-bottom:12px;">Incoming reports</div>
-      ${data.incidents.filter(i=>i.status!=='resolved').map(feedCard).join('') || `<div class="empty-state">Nothing active.</div>`}</div>`;
+      ${data.incidents.filter(i=>i && i.status!=='resolved').map(feedCard).join('') || `<div class="empty-state">Nothing active.</div>`}</div>`;
 }
 function statCard(num,label){ return `<div class="card stat"><div class="stat-num">${num}</div><div class="stat-label">${label}</div></div>`; }
 function viewOrgCases(){
   return `<div class="page-head"><div><div class="page-title">Cases</div></div></div>
-    ${data.cases.length ? `<div class="grid grid-2">${data.cases.map(c=>`<div class="card" onclick="openCase('${c.id}')" style="cursor:pointer;">
-      <div style="display:flex; justify-content:space-between;"><div style="font-weight:700; font-size:14px;">${escapeHtml(c.title)}</div>${statusBadge(c.status)}</div>
-      <div class="feed-meta" style="margin-top:6px;">Priority: ${c.priority}</div><div class="feed-meta" style="margin-top:4px;">Updated ${fmtAgo(c.updatedAt)}</div></div>`).join('')}</div>`
+    ${data.cases.length ? `<div class="grid grid-2">${data.cases.map(c=>c?`<div class="card" onclick="openCase('${q(c.id)}')" style="cursor:pointer;">
+      <div style="display:flex; justify-content:space-between;"><div style="font-weight:700; font-size:14px;">${escapeHtml(c.title||'Untitled case')}</div>${statusBadge(c.status)}</div>
+      <div class="feed-meta" style="margin-top:6px;">Priority: ${escapeHtml(c.priority||'medium')}</div><div class="feed-meta" style="margin-top:4px;">Updated ${fmtAgo(c.updatedAt)}</div></div>`:'').join('')}</div>`
       : `<div class="empty-state">No cases yet. Open one from an incident.</div>`}`;
 }
 function openCase(id){ state.selectedCase=id; setView('case'); }
 function viewCaseDetail(){
-  const c = data.cases.find(c=>c.id===state.selectedCase);
+  const c = data.cases.find(c=>c && c.id===state.selectedCase);
   if(!c) return `<div class="empty-state">Case not found.</div>`;
   return `<button class="btn btn-ghost" style="margin-bottom:16px;" onclick="setView('org-cases')">← Back to Cases</button>
-    <div class="page-head"><div><div class="page-title">${escapeHtml(c.title)}</div><div class="page-sub">Case ${c.id}</div></div>${statusBadge(c.status)}</div>
-    <button class="btn btn-primary" onclick="openIncident('${c.incidentId}')">View linked incident →</button>`;
+    <div class="page-head"><div><div class="page-title">${escapeHtml(c.title||'Untitled case')}</div><div class="page-sub">Case ${escapeHtml(c.id||'')}</div></div>${statusBadge(c.status)}</div>
+    <button class="btn btn-primary" onclick="openIncident('${q(c.incidentId)}')">View linked incident →</button>`;
 }
 function viewOrgComms(){
   if(!data.incidents.length) return `<div class="page-head"><div><div class="page-title">Public Updates</div></div></div><div class="empty-state">No incidents to comment on yet.</div>`;
   return `<div class="page-head"><div><div class="page-title">Public Updates</div><div class="page-sub">Official updates appear on the incident timeline for everyone.</div></div></div>
     <div class="card" style="max-width:560px;">
       <div class="field"><label>Message</label><textarea id="comms-text" placeholder="e.g. Repair crew on site, restoration expected in 8 hours."></textarea></div>
-      <div class="field"><label>Attach to incident</label><select id="comms-inc">${data.incidents.map(i=>`<option value="${i.id}">${escapeHtml(i.title)}</option>`).join('')}</select></div>
+      <div class="field"><label>Attach to incident</label><select id="comms-inc">${data.incidents.filter(i=>i && i.id!=null).map(i=>`<option value="${escAttr(i.id)}">${escapeHtml(i.title||'Untitled')}</option>`).join('')}</select></div>
       <button class="btn btn-primary" onclick="postOfficial()">Publish official update</button>
     </div>`;
 }
 async function postOfficial(){ return guardOnce('postOfficial', async ()=>{
-  const id = document.getElementById('comms-inc').value;
-  const text = document.getElementById('comms-text').value.trim();
+  const sel = document.getElementById('comms-inc');
+  const id = sel ? sel.value : '';
+  const text = val('comms-text');
   if(!text){ toast('Missing info','Write a message first.','⚠️'); return; }
-  const inc = data.incidents.find(i=>i.id===id);
+  const inc = data.incidents.find(i=>i && i.id===id);
   if(!inc){ toast('Incident not found', 'That incident may have been removed — pick another.', '⚠️'); return; }
   if(!Array.isArray(inc.timeline)) inc.timeline = [];
   inc.timeline.push({time:now(), text, source:'official', by:activeOrgName()});
-  const saved = await persist('incidents');
-  if(saved) toast('Published', 'Official update added to incident timeline.', '📣');
+  const res = await saveRow('incidents', inc);
+  toast('Published', res.synced ? 'Official update added to incident timeline.' : 'Saved on this device — will sync when you’re back online.', '📣');
   setView('org-comms');
 });}
 
-/* expose */
-Object.assign(window, {setRole,setView,toggleFilter,openIncident,confirmIncident,advanceIncident,openCaseFor,openProvider,
-  submitProvider,requestBooking,acceptBooking,pickSeverity,submitReport,openCase,postOfficial,useMyLocationFor,submitOrg});
+/* expose inline-handler entry points */
+Object.assign(window, {setRole,setView,runSearch,clearSearch,toggleFilter,dismissMapHint,openIncident,confirmIncident,
+  advanceIncident,openCaseFor,openProvider,submitProvider,requestBooking,acceptBooking,pickSeverity,
+  submitReport,openCase,postOfficial,useMyLocationFor,applyManualCoords,submitOrg,requestGeolocation,
+  syncNow,renderContent});
 
-// Wait for Supabase to load, then start app (polls instead of a fixed delay, so it works on slow connections too)
+/* ---------------- BOOT ---------------- */
+let booted = false;
+function boot(){
+  if(booted) return; booted = true;
+  loadCacheIntoData();       /* instant, works offline */
+  state.loading = false;
+  render();
+  requestGeolocation();
+  refreshFromServer(true);   /* live data merges in when it arrives */
+  subscribeRealtimeSafe();
+  startPollingFallback();
+  window.addEventListener('online', ()=>{ refreshFromServer(false); });
+  window.addEventListener('offline', ()=>{ backendLive=false; updateSyncUI(); });
+}
+
+/* Start once the Supabase library arrives — or after ~6s regardless (offline mode).
+   Backend calls self-heal via ensureClient() if the library arrives late. */
 function waitForSupabaseThenStart(attemptsLeft){
-  if(window.supabase && !supabase){
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    loadAll();
-    return;
-  }
+  if(booted) return;
+  const libReady = (typeof window.__supabaseReady==='function') ? window.__supabaseReady() : !!(window.supabase && window.supabase.createClient);
+  if(libReady){ ensureClient(); boot(); return; }
   if(attemptsLeft <= 0){
-    console.warn('Supabase library never loaded — starting with empty/local state.');
-    loadAll();
+    console.log('Starting in offline mode (Supabase library not loaded yet — will connect automatically if it arrives).');
+    boot();
     return;
   }
   setTimeout(()=>waitForSupabaseThenStart(attemptsLeft-1), 200);
 }
-waitForSupabaseThenStart(50); // up to ~10s
+waitForSupabaseThenStart(30);
+</script>
+</body>
+</html>
+ForSupabaseThenStart(30);
 </script>
 </body>
 </html>
